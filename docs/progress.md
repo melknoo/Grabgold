@@ -168,7 +168,99 @@
 - Left/Right-Spalten des SpriteFrames sind **nicht gespiegelt** (Facing korrekt) → Punkt in
   `docs/assets-todo.md` geschlossen.
 
+## Phase 4 — Figurenwechsel ✅ (2026-08-20)
+
+**Pack-Befund vorab (Timing folgt den Frames, nicht umgekehrt)**
+- Die 93 Figuren unter `Actor/Character/` haben ein **anderes Format** als NinjaGreen: 16×16-Frames
+  und `Attack.png` = 64×16, also **4 Richtungen × 1 Frame**. Der Zwerg hat damit **eine einzige
+  Angriffs-Pose**, keine 4-Frame-Animation. Auch alle Ninja-Farbvarianten liegen so vor; nur
+  NinjaGreen ist unter `CharacterAnimated/` voll animiert.
+- Konsequenz (User-Entscheidung): die eine Pose wird über einen **langen, schweren Startup gehalten**
+  — dieselbe Lesbarkeits-Idee wie der Skelett-Telegraph aus Phase 3.
+- Kein Skalierungsbruch: NinjaGreen belegt 15×15 px in seinem 32×32-Frame, Knight 14×14 in 16×16 →
+  on-screen gleich groß.
+- Sheet-Achsen empirisch verifiziert (nicht geraten): **Spalte = Richtung, Zeile = Frame**, wie bei
+  NinjaGreen. Beleg: Row0 des Walk-Sheets ist pixelgleich mit der Idle-Pose (Distanz 0), und
+  `Idle` col2 ist der exakte Spiegel von col3. Richtungszuordnung 0=down/1=up/2=left/3=right über
+  die Waffen-Ausdehnung im Attack-Sheet bestätigt.
+
+**Figurenwahl (User)**
+- Zwerg = **Knight** (grauer Vollhelm-Panzer — liest sich als schwer/unverrückbar).
+- „kein Knockback" = **er wird nicht weggestoßen** (Vorteil zum Nachteil „langsam", analog
+  Kurier schnell/schwach). Seine eigenen Treffer stoßen weiterhin.
+
+**Architektur**
+- **`FigureProfile`** (`resources/figure_profile.gd`) bündelt pro Figur: `display_name`,
+  `SpriteFrames`, `AnimationLibrary`, `TuningStats`. Eine neue Figur = ein neues `.tres`, kein Code.
+  → `figure_kurier.tres`, `figure_zwerg.tres`.
+- **`PartyManager`** (`actors/player/party_manager.gd`, Node in `main.tscn`) hält das Ensemble und
+  schaltet durch. Input-Action **`switch_figure`** (Q + beide Gamepad-Schultertasten).
+- *Profil-Tausch statt Despawn/Respawn* (Abweichung vom Kickoff-Wortlaut „die anderen despawnen",
+  mit Begründung): es gibt ohnehin nie zwei Körper in der Welt, und der Tausch am bestehenden
+  Player-Node erbt Position/Velocity/laufende I-Frames automatisch, statt sie bei jedem Wechsel von
+  Hand umzuhängen. Weniger Failure-Modes, gleiches Spielverhalten.
+- *Per-Figur-Zustand liegt im PartyManager*, nicht im Player: Health muss den Wechsel überleben —
+  und ab Phase 5 gilt das genauso für die Korruption (der Reif wird weitergereicht, Korruption baut
+  extrem langsam ab). Der Spieler verteilt Schaden auf seine Leute; das braucht persistente Slots.
+- *Wechsel gesperrt außer in idle/move* (`Player.can_switch()`): sonst wird die Schultertaste zum
+  Cancel-Tool für Angriff und Hitstun und der Nachteil „langsamer Zwerg" wäre folgenlos.
+- *Wechsel startet aus dem Stand* (`velocity = ZERO`): sonst erbt der Zwerg die Vollgeschwindigkeit
+  des Kuriers und der Tempo-Unterschied wäre im Moment des Wechsels unsichtbar.
+- **Zwei Felder neu in `TuningStats`** (beides Feel-Werte, gehören per CLAUDE.md dorthin):
+  `hitbox_offset` (war eine `const` im Player-Skript; muss pro Figur unterschiedlich sein) und
+  `knockback_taken_scale` (1.0 Kurier / 0.0 Zwerg — absichtlich float statt bool, Zwischenwerte
+  sind tunebar). Das Skelett nutzt `hitbox_offset` jetzt ebenfalls aus seinem `.tres`, sonst wäre
+  das Feld für Gegner wirkungslos gewesen.
+
+**Tooling (neu)**
+- **`tools/build_figure_resources.gd`** baut SpriteFrames *und* AnimationLibrary pro Figur aus dem
+  Pack. Es leitet die Zeiten der Call-Method-Tracks **aus den Frame-Werten der jeweiligen
+  `TuningStats` ab** — Anim-Timing und `.tres` können damit nicht auseinanderlaufen. Wer
+  Startup/Active/Recovery ändert, lässt das Tool neu laufen. Validiert außerdem die Sheet-Maße;
+  hat dabei gleich gefunden, dass NinjaGreens `Hit.png` **2** Hurt-Frames hat, nicht 1.
+- **`tools/add_input_actions.gd`** legt fehlende Input-Actions per ProjectSettings-API an (idempotent).
+- **`tests/phase4_sim.gd` + `.tscn`** — 27 Checks, wiederholbar.
+  *Merker:* Der Test läuft als **Szene**, nicht per `--script`. Bei `--script` registriert Godot die
+  Autoloads nicht, und Hitbox/Hurtbox referenzieren `Debug` → Compile-Error vor dem ersten Test.
+- *Merker Serialisierung:* Ein typisiertes `Array[FigureProfile]` steht in der `.tscn` als
+  `figures = Array[ExtResource("<script-id>")]([ExtResource(...), ...])`. Von der Engine ermittelt,
+  nicht geraten. **Nicht** die ganze Szene per `PackedScene.pack()` neu schreiben — das klopft die
+  instanzierten Sub-Szenen flach (schreibt `type=` und `unique_id=` neu).
+
+**Verifikation (headless, 27/27 grün)**
+- Startzustand, Profil-Tausch (Stats/SpriteFrames/AnimLibrary wechseln alle mit), Attack-Länge
+  0.2 s → 0.4 s.
+- **Tempo-Unterschied gemessen:** Kurier 44.7 px in 30 Frames, Zwerg 27.7 px = **62 %** (58/95).
+- **Zwerg steht wie ein Fels:** 0.00 px Versatz bei 400er Knockback, Schaden kommt trotzdem an.
+  Kurier fliegt weiterhin 21.8 px.
+- **Wechsel-Sperre** im Attack greift; **Health-Persistenz** über zwei Wechsel hinweg korrekt.
+- **Zwerg trifft** trotz 1-Frame-Pose und kleinerem Offset: Skelett 4→2 (Schaden 2 vs. Kurier 1),
+  Attack endet sauber. Gesamtbindung bei Treffer ≈ 34 Frames (24 Anim + 10 Hitstop) ≈ 0.57 s.
+- **Phase-2-Regression:** Kurier-Angriff unverändert (Schaden 1, endet in Idle).
+- **Zwei starke Gegenproben, dass das Tool nichts kaputt macht:** die neu generierte
+  `player_ninja_frames.tres` ist **byte-identisch** zur abgenommenen Fassung, und die abgeleitete
+  `player_kurier_anims.tres` ist (bis auf Sub-Resource-IDs) identisch zur handgebauten
+  `player_anims.tres` aus Phase 2 (die dadurch überflüssig wurde und gelöscht ist).
+
+**Offen / bekannte Punkte**
+- **Feel-Abnahme beim User:** Ist der Unterschied ohne HUD spürbar? Tuning-Achsen liegen in
+  `player_zwerg.tres` (max_speed 58, Attack 9/6/9, damage 2, knockback_speed 340, hitstop 10,
+  max_health 9). Nach Änderungen an den Attack-Frames `tools/build_figure_resources.gd` neu laufen
+  lassen.
+- `acceleration`/`friction` sind bei beiden Figuren **absichtlich identisch** (2400/3200). Das wäre
+  eine starke zusätzliche Feel-Achse für den Zwerg (träges Anfahren), fällt aber unter die
+  Rücksprache-Regel in CLAUDE.md → erst nach Freigabe.
+- **Knight-Links/Rechts** noch nicht visuell bestätigt (Beleg ist die Waffen-Ausdehnung im Sheet).
+  Falls gespiegelt: `DIRS` im Build-Tool tauschen.
+- Knight hat **kein Hit-Sheet** → hurt = Idle-Pose + Blink (Platzhalter-Feedback, wie beim Skelett).
+- Kein Camera-Node im Spiel; bei Räumen größer als der Viewport (Phase 6) muss der Wechsel die
+  Kamera nicht anfassen — der Player-Node bleibt derselbe. Netter Nebeneffekt des Profil-Tauschs.
+- Nur 2 der 4 geplanten Figuren existieren. Weitere = je ein `figure_*.tres` + Eintrag in
+  `PartyManager.figures`.
+
 ## Nächste Phase
-- **Phase 4 — Figurenwechsel** (nach Go & Fairness-Abnahme): 2 Figuren mit unterschiedlichem
-  Movement-/Angriffsgefühl (Kurier = schnell/schwach, Zwerg = langsam/kein Knockback) über je eigene
-  `.tres`; Schultertaste wechselt, andere despawnt. Unterschied ohne HUD spürbar.
+- **Phase 5 — Reif** (nach Go & Feel-Abnahme von Phase 4): Kanalisierung auf gehaltene Taste,
+  Zeitdehnung **nur über den HitstopManager** (nie `Engine.time_scale`), Phase-Dash (zur Laufzeit
+  `player_body`-Mask um Bit 3 kürzen + Hurtbox aussetzen, nur Masken toggeln), Korruptionszähler
+  und Stufen 1–2 als Feedback. Der Korruptions-Zustand gehört pro Figur in den `PartyManager`
+  (dort liegt schon die persistente Health) — der Reif ist weiterreichbar.

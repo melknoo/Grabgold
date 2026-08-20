@@ -4,19 +4,19 @@
 
 [resource]
 script = ExtResource("1_stats")
-max_speed = 95.0
+max_speed = 58.0
 acceleration = 2400.0
 friction = 3200.0
-attack_startup_frames = 3
+attack_startup_frames = 9
 attack_active_frames = 6
-attack_recovery_frames = 3
-hitbox_offset = 13.0
-knockback_speed = 220.0
-knockback_duration = 0.18
-hitstop_frames = 6
-knockback_taken_scale = 1.0
+attack_recovery_frames = 9
+hitbox_offset = 11.0
+knockback_speed = 340.0
+knockback_duration = 0.24
+hitstop_frames = 10
+knockback_taken_scale = 0.0
 iframe_duration = 0.6
 iframe_blink_interval = 0.06
 attack_buffer_frames = 6
-attack_damage = 1
-max_health = 6
+attack_damage = 2
+max_health = 9

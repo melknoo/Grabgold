@@ -98,12 +98,14 @@ aussetzen (invuln). Nur Masken toggeln, keinen Node-Umbau.
 assets/{external/<packname>/,  placeholder/}   external = manuell abgelegte Packs, nie herunterladen
 docs/{progress,credits,assets-todo}.md
 globals/            Autoloads (hitstop_manager.gd, debug.gd)
-resources/          tuning_stats.gd (class_name TuningStats) + *.tres pro Aktor
+resources/          tuning_stats.gd + figure_profile.gd (class_names) + *.tres pro Aktor/Figur
 components/         hitbox, hurtbox, state_machine/  (wiederverwendbar)
-actors/player/      player.tscn/.gd + states/{idle,move,attack,hurt}.gd
+actors/player/      player.tscn/.gd + party_manager.gd + states/{idle,move,attack,hurt}.gd
 actors/enemy/       enemy.tscn/.gd + states/{idle,approach,telegraph,attack,retreat,hurt}.gd
 ui/debug_overlay/   debug_overlay.tscn/.gd
 scenes/             main.tscn (Bootstrap/Arena) + rooms/room_01.tscn (Phase 6)
+tools/              Godot-Tool-Skripte, die Resources/Settings generieren (nie von Hand editieren)
+tests/              headless Verifikations-Szenen (*_sim.tscn/.gd)
 ```
 
 ## Namenskonventionen
@@ -140,6 +142,47 @@ Zeitdehnung/Hitstop **niemals** über `Engine.time_scale` (träfe UI + Partikel)
 - **Gegner** (`actors/enemy/skeleton.*`): FSM idle→approach→telegraph→attack→retreat (+hurt/dead),
   **kein Pathfinding** (Bewegung direkt Richtung/weg vom Player). Telegraph = Rot-Blink + gehaltene
   Attack-Pose (Lesbarkeit). Nutzt `Hitbox`/`Hurtbox` (enemy_hitbox 64 → player_hurtbox 8).
+
+## Figuren-Ensemble (Phase 4)
+
+Eine Figur = **`FigureProfile`** (`resources/figure_profile.gd`): `display_name` + `SpriteFrames` +
+`AnimationLibrary` + `TuningStats`. Je Figur ein `figure_*.tres`. Eine neue Figur anlegen heißt:
+Profil-`.tres` schreiben, in `PartyManager.figures` eintragen — **kein Code**.
+
+- **`PartyManager`** (`actors/player/party_manager.gd`, Node in `main.tscn`) schaltet durch das
+  Ensemble. Input-Action `switch_figure` (Q + Gamepad-Schultertasten).
+- **Profil-Tausch, kein Despawn/Respawn.** Der Player-Node bleibt dieselbe Instanz und bekommt
+  Sprite-Satz/AnimLibrary/Stats gesetzt (`Player.apply_profile`). Position, Velocity und laufende
+  I-Frames überleben den Wechsel dadurch von selbst.
+- **Per-Figur-Zustand lebt im `PartyManager`**, nicht im Player (Health; ab Phase 5 die Korruption).
+  Er muss den Wechsel überleben — der Reif ist weiterreichbar und Korruption baut extrem langsam ab.
+- **Wechsel nur aus `idle`/`move`** (`Player.can_switch()`). Invariante: die Schultertaste darf
+  weder Angriff noch Hitstun canceln, sonst ist der Nachteil „langsamer Zwerg" folgenlos.
+- **Wechsel setzt `velocity = ZERO`**, sonst erbt die neue Figur das Tempo der alten.
+- Figuren bisher: **Kurier** (NinjaGreen, schnell/schwach, wird weggestoßen) und **Zwerg**
+  (Knight, langsam/hoher Schaden, `knockback_taken_scale = 0.0` → steht wie ein Fels).
+
+## Generierte Resources — nie von Hand
+
+`SpriteFrames` und `AnimationLibrary` werden **erzeugt**, nicht editiert:
+
+- `$GODOT --headless --path . --script res://tools/build_figure_resources.gd`
+  baut `player_*_frames.tres` und `player_*_anims.tres` aus dem Pack. Die Zeiten der
+  Call-Method-Tracks werden **aus den Frame-Werten der jeweiligen `TuningStats` abgeleitet** —
+  wer `attack_startup/active/recovery_frames` im `.tres` ändert, **muss das Tool neu laufen lassen**,
+  sonst passen Anim und Stats nicht mehr zusammen.
+- `$GODOT --headless --path . --script res://tools/add_input_actions.gd` legt fehlende
+  Input-Actions per ProjectSettings-API an (idempotent).
+- Sheet-Konvention im ganzen Pack: **Spalte = Richtung** (0=down, 1=up, 2=left, 3=right),
+  **Zeile = Frame**. Gilt für NinjaGreen (32×32) *und* `Actor/Character/*` (16×16).
+  Achtung: `Actor/Character/*` hat nur **1 Attack-Frame** (Sheet 64×16), NinjaGreen hat 4.
+
+## Tests
+
+`$GODOT --headless --path . res://tests/phase4_sim.tscn` — muss „ALLES GRUEN" melden.
+
+Tests laufen als **Szene**, nicht per `--script`: bei `--script` registriert Godot die Autoloads
+nicht, und `Hitbox`/`Hurtbox` referenzieren `Debug` → Compile-Error vor dem ersten Check.
 
 ## Persistenz-Pflicht
 

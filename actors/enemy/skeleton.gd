@@ -13,7 +13,6 @@ extends CharacterBody2D
 @onready var hurtbox: Hurtbox = $Hurtbox
 @onready var state_machine: StateMachine = $StateMachine
 
-const HITBOX_OFFSET := 12.0
 
 var facing: StringName = &"down"
 var _health: int
@@ -60,11 +59,14 @@ func enable_hitbox() -> void:
 	hitbox.knockback_speed = stats.knockback_speed
 	hitbox.hitstop_frames = stats.hitstop_frames
 	hitbox.knockback_dir = facing_vector()
-	hitbox.position = facing_vector() * HITBOX_OFFSET
+	hitbox.position = facing_vector() * stats.hitbox_offset
 	hitbox.enable()
 
 func disable_hitbox() -> void:
 	hitbox.disable()
+
+func get_health() -> int:
+	return _health
 
 func _on_hurt(damage: int, knockback: Vector2) -> void:
 	_health = maxi(0, _health - damage)

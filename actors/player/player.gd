@@ -1,7 +1,10 @@
 class_name Player
 extends CharacterBody2D
 
-@export var stats: TuningStats
+## Signalisiert Health-Aenderungen nach aussen (PartyManager haelt sie pro Figur persistent).
+signal health_changed(current: int, maximum: int)
+
+@export var profile: FigureProfile
 
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var state_machine: StateMachine = $StateMachine
@@ -9,24 +12,60 @@ extends CharacterBody2D
 @onready var hitbox: Hitbox = $Hitbox
 @onready var hurtbox: Hurtbox = $Hurtbox
 
-const HITBOX_OFFSET := 13.0
+## Name der AnimationLibrary am AnimationPlayer. Leerer StringName = Default-Library, damit die
+## Animation weiterhin als "attack" (ohne Praefix) abgespielt wird.
+const ANIM_LIBRARY := &""
 
+var stats: TuningStats
 var facing: StringName = &"down"
 var _attack_buffer_frames_left: int = 0
 var _health: int
 
 func _ready() -> void:
 	add_to_group(&"player")
-	_health = stats.max_health
 	hurtbox.sprite = sprite
 	hurtbox.hit_taken.connect(_on_hurt)
+	apply_profile(profile)
+
+## Setzt Sprite-Satz, Angriffs-Animation und Feel-Werte der Figur. Der Player-Node bleibt dabei
+## dieselbe Instanz (siehe docs/progress.md, Phase 4: Profil-Tausch statt Despawn/Respawn) —
+## Position, Velocity und laufende I-Frames ueberleben den Wechsel damit von selbst.
+func apply_profile(new_profile: FigureProfile) -> void:
+	if new_profile == null:
+		push_error("Player: kein FigureProfile gesetzt.")
+		return
+	profile = new_profile
+	stats = new_profile.stats
+	sprite.sprite_frames = new_profile.frames
+	if animation_player.has_animation_library(ANIM_LIBRARY):
+		animation_player.remove_animation_library(ANIM_LIBRARY)
+	animation_player.add_animation_library(ANIM_LIBRARY, new_profile.anims)
+	# I-Frame-Verhalten ist pro Figur tunebar -> aus den Stats in die Hurtbox spiegeln.
+	hurtbox.iframe_duration = stats.iframe_duration
+	hurtbox.iframe_blink_interval = stats.iframe_blink_interval
+	set_health(stats.max_health)
+
+func set_health(value: int) -> void:
+	_health = clampi(value, 0, stats.max_health)
+	health_changed.emit(_health, stats.max_health)
+
+func get_health() -> int:
+	return _health
+
+## Ein Figurenwechsel darf einen laufenden Schlag oder Hitstun nicht abbrechen — sonst wird die
+## Schultertaste zum Cancel-Tool und der Nachteil "langsamer Zwerg" waere folgenlos.
+func can_switch() -> bool:
+	if state_machine == null or state_machine.current_state == null:
+		return false
+	var current: String = state_machine.current_state.name
+	return current == "Idle" or current == "Move"
 
 func _on_hurt(damage: int, knockback: Vector2) -> void:
-	_health = maxi(0, _health - damage)
+	set_health(_health - damage)
 	if _health == 0:
-		# Phase-3: kein echtes Game-Over — Health wird resettet.
-		_health = stats.max_health
-	state_machine.transition_to(&"hurt", {"knockback": knockback})
+		# Phase-3/4: kein echtes Game-Over — Health wird resettet.
+		set_health(stats.max_health)
+	state_machine.transition_to(&"hurt", {"knockback": knockback * stats.knockback_taken_scale})
 
 func facing_vector() -> Vector2:
 	match facing:
@@ -53,7 +92,7 @@ func enable_hitbox() -> void:
 	hitbox.knockback_speed = stats.knockback_speed
 	hitbox.hitstop_frames = stats.hitstop_frames
 	hitbox.knockback_dir = facing_vector()
-	hitbox.position = facing_vector() * HITBOX_OFFSET
+	hitbox.position = facing_vector() * stats.hitbox_offset
 	hitbox.enable()
 
 func disable_hitbox() -> void:

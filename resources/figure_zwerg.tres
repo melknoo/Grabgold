@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="FigureProfile" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://resources/figure_profile.gd" id="1_profile"]
+[ext_resource type="SpriteFrames" path="res://resources/player_knight_frames.tres" id="2_frames"]
+[ext_resource type="AnimationLibrary" path="res://resources/player_zwerg_anims.tres" id="3_anims"]
+[ext_resource type="Resource" path="res://resources/player_zwerg.tres" id="4_stats"]
+
+[resource]
+script = ExtResource("1_profile")
+display_name = "Zwerg"
+frames = ExtResource("2_frames")
+anims = ExtResource("3_anims")
+stats = ExtResource("4_stats")

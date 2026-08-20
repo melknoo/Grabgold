@@ -10,6 +10,7 @@ friction = 1600.0
 attack_startup_frames = 3
 attack_active_frames = 6
 attack_recovery_frames = 3
+hitbox_offset = 12.0
 knockback_speed = 170.0
 knockback_duration = 0.18
 hitstop_frames = 6

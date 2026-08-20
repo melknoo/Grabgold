@@ -1,14 +1,13 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://actors/player/player.gd" id="1_player"]
-[ext_resource type="Resource" path="res://resources/player_kurier.tres" id="2_kurier"]
+[ext_resource type="Resource" path="res://resources/figure_kurier.tres" id="2_profile"]
 [ext_resource type="SpriteFrames" path="res://resources/player_ninja_frames.tres" id="3_frames"]
 [ext_resource type="Script" path="res://components/state_machine/state_machine.gd" id="4_statemachine"]
 [ext_resource type="Script" path="res://actors/player/states/idle.gd" id="5_idle"]
 [ext_resource type="Script" path="res://actors/player/states/move.gd" id="6_move"]
 [ext_resource type="Script" path="res://actors/player/states/attack.gd" id="7_attack"]
 [ext_resource type="Script" path="res://actors/player/states/hurt.gd" id="8_hurt"]
-[ext_resource type="AnimationLibrary" path="res://resources/player_anims.tres" id="9_anims"]
 [ext_resource type="Script" path="res://components/hitbox.gd" id="10_hitbox"]
 [ext_resource type="Script" path="res://components/hurtbox.gd" id="11_hurtbox"]
 
@@ -25,7 +24,7 @@ size = Vector2(12, 14)
 collision_layer = 2
 collision_mask = 1
 script = ExtResource("1_player")
-stats = ExtResource("2_kurier")
+profile = ExtResource("2_profile")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 sprite_frames = ExtResource("3_frames")
@@ -37,9 +36,6 @@ position = Vector2(0, 4)
 shape = SubResource("RectangleShape2D_body")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {
-&"": ExtResource("9_anims")
-}
 
 [node name="Hitbox" type="Area2D" parent="."]
 collision_layer = 16

@@ -23,6 +23,12 @@ extends Resource
 @export var attack_active_frames: int = 6
 @export var attack_recovery_frames: int = 3
 
+@export_group("Attack Reach (Phase 4)")
+## Abstand der Hitbox-Mitte vom Aktor-Zentrum in px, in Facing-Richtung. War bis Phase 3 eine
+## const im Player-Skript; ist ein Feel-/Reichweiten-Wert und muss pro Figur unterschiedlich
+## sein (32px-Ninja vs. 16px-Knight), darum hier.
+@export var hitbox_offset: float = 13.0
+
 @export_group("Hit Feedback (Phase 2)")
 @export var knockback_speed: float = 220.0
 @export var knockback_curve: Curve
@@ -30,6 +36,9 @@ extends Resource
 @export var hitstop_frames: int = 6
 
 @export_group("Defense (Phase 2)")
+## Faktor auf den EINGESTECKTEN Knockback. 1.0 = wird normal weggestossen, 0.0 = steht wie ein
+## Fels (Zwerg, Phase 4). Absichtlich float und kein bool: Zwischenwerte sind tunebar.
+@export var knockback_taken_scale: float = 1.0
 @export var iframe_duration: float = 0.6
 @export var iframe_blink_interval: float = 0.06
 

@@ -1,9 +1,13 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://actors/player/player.tscn" id="2_player"]
 [ext_resource type="PackedScene" path="res://actors/enemy/skeleton.tscn" id="3_skeleton"]
 [ext_resource type="PackedScene" path="res://ui/debug_overlay/debug_overlay.tscn" id="4_overlay"]
+[ext_resource type="Script" path="res://actors/player/party_manager.gd" id="5_party"]
+[ext_resource type="Script" path="res://resources/figure_profile.gd" id="6_profile"]
+[ext_resource type="Resource" path="res://resources/figure_kurier.tres" id="7_kurier"]
+[ext_resource type="Resource" path="res://resources/figure_zwerg.tres" id="8_zwerg"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -15,3 +19,8 @@ position = Vector2(160, 90)
 position = Vector2(110, 60)
 
 [node name="DebugOverlay" parent="." instance=ExtResource("4_overlay")]
+
+[node name="PartyManager" type="Node" parent="." node_paths=PackedStringArray("player")]
+script = ExtResource("5_party")
+figures = Array[ExtResource("6_profile")]([ExtResource("7_kurier"), ExtResource("8_zwerg")])
+player = NodePath("../Player")
