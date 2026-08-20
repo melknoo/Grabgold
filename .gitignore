@@ -1,0 +1,16 @@
+# Godot 4 — Editor-/Import-Cache. Maschinenlokal, wird beim Import neu erzeugt.
+# Muss ignoriert werden: sonst erzeugt jeder `--import` auf der anderen Maschine
+# tausende bedeutungslose Diffs. Die `*.import`-Dateien neben den Assets bleiben
+# dagegen versioniert (Godot braucht sie).
+/.godot/
+
+# Export-Artefakte
+/build/
+/export/
+*.exe
+*.pck
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db

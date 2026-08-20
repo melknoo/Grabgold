@@ -4,12 +4,34 @@
 
 ## Engine & Aufruf
 
-- **Godot `4.6.1.stable`**, installiert als **Flatpak** (`org.godotengine.Godot`).
-- **Kein `godot` im PATH.** Immer:
-  - Editor öffnen: `flatpak run org.godotengine.Godot --editor --path .`
-  - Spiel starten: `flatpak run org.godotengine.Godot --path .`
-  - Headless-Import (CI/Validierung): `flatpak run org.godotengine.Godot --headless --path . --import`
-  - Klassen-DB dumpen bei Signatur-Zweifel: `flatpak run org.godotengine.Godot --doctool <out>`
+Das Projekt wird auf **zwei Maschinen** entwickelt. Godot liegt auf **keiner** von beiden im PATH.
+`$GODOT` unten steht jeweils für den passenden Aufruf der eigenen Maschine.
+
+**Linux (Flatpak) — Godot `4.6.1.stable`**
+
+- `GODOT="flatpak run org.godotengine.Godot"`
+
+**Windows 11 (portable EXE) — Godot `4.6.3.stable`**
+
+- `GODOT="$env:USERPROFILE\Downloads\Godot_v4.6.3-stable_win64.exe\Godot_v4.6.3-stable_win64_console.exe"`
+  (Aufruf in PowerShell mit `& $GODOT ...`)
+- **Achtung, Stolperfalle:** `Godot_v4.6.3-stable_win64.exe` ist ein **Ordner**, nicht die Binary.
+  Immer die `_console.exe` darin nehmen — die GUI-Variante gibt headless keine Ausgabe zurück.
+- Kein Flatpak, kein `godot`-Alias. Bash-Aufrufe der `.exe` scheitern („Is a directory"),
+  darum für Godot-Kommandos **PowerShell** verwenden.
+
+**Kommandos (beide Maschinen, `$GODOT` einsetzen)**
+
+- Editor öffnen: `$GODOT --editor --path .`
+- Spiel starten: `$GODOT --path .`
+- Headless-Import (CI/Validierung): `$GODOT --headless --path . --import`
+- Klassen-DB dumpen bei Signatur-Zweifel: `$GODOT --headless --doctool <out>`
+  — **`<out>` muss vorher existieren**, sonst „Argument supplied to --doctool must be a valid
+  directory path"; Ergebnis landet in `<out>/doc/classes/*.xml` (~1063 Klassen).
+
+**Versions-Delta 4.6.1 ↔ 4.6.3:** nur Patch-Level, keine bekannten API-Unterschiede für dieses
+Projekt. Bei Signatur-Zweifeln gilt trotzdem Regel Null gegen die **lokal** gedumpte Klassen-DB.
+
 - **Regel Null:** Methodensignaturen (`move_and_slide`, `AnimationPlayer` Call-Method-Tracks,
   Area2D-Masken) gegen die echte Klassen-DB/lokale Doku prüfen — nie aus dem Gedächtnis raten.
 - **4.6-Besonderheit:** `TileMap` gibt es nicht mehr → **`TileMapLayer`** verwenden (Phase 6).

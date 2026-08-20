@@ -1,8 +1,0 @@
-res://resources/player_ninja_frames.tres
-res://actors/player/player.gd
-res://actors/player/states/attack.gd
-res://actors/player/states/idle.gd
-res://actors/player/states/move.gd
-res://actors/player/states/hurt.gd
-res://components/state_machine/state.gd
-res://components/state_machine/state_machine.gd

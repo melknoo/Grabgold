@@ -16,8 +16,8 @@ nachmalen, nichts herunterladen.
 
 - [ ] **Hintergrund-Tile** in `scenes/main.tscn` ist noch der generierte `tile_16.png`.
       Echtes Terrain kommt mit dem `TileMapLayer`-Raum in **Phase 6** (TilesetFloor/Field aus dem Pack).
-- [ ] **Left/Right-Spalten** (col2/col3) zur Laufzeit prüfen; falls Facing gespiegelt, im Build-Tool
-      left↔right tauschen. (down=col0, up=col1 sind bestätigt.)
+- [x] **Left/Right-Spalten** (col2/col3) zur Laufzeit geprüft — **nicht gespiegelt**, Facing korrekt
+      (User-Abnahme im Editor, 2026-08-20). Kein Tausch im Build-Tool nötig.
 - [ ] Zwerg-Figur (Phase 4) + Gegner (Phase 3) noch nicht ausgewählt.
 
 ## Platzhalter-Register

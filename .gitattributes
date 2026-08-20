@@ -1,0 +1,11 @@
+# Zwei-Maschinen-Projekt (Linux + Windows). Godot schreibt .tscn/.tres/.gd/.import mit LF.
+# Ohne diese Normalisierung markiert Git auf Windows (core.autocrlf=true global) tausende
+# Dateien als geändert, obwohl nur die Zeilenenden differieren.
+* text=auto eol=lf
+
+# Binärdateien nie anfassen
+*.png binary
+*.ogg binary
+*.wav binary
+*.ttf binary
+*.tpz binary

@@ -136,6 +136,38 @@
 - Skelett-Sprite hat keine eigene Hurt-Anim → Hurt = Idle-Pose + Rot-Flash (Platzhalter-Feedback).
 - Kein echtes Game-Over (Phase 6+).
 
+## Zweiter Arbeitsplatz + Repo-Hygiene ✅ (2026-08-20)
+
+**Kontext:** Weiterarbeit auf einem zweiten Rechner (Windows 11) statt Linux/Flatpak.
+
+**Erledigt**
+- **Godot auf Windows verifiziert:** `4.6.3.stable.official.7d41c59c4` (Patch-Delta zu 4.6.1 auf dem
+  Linux-Rechner, keine für dieses Projekt relevanten API-Unterschiede). Portable EXE unter
+  `~/Downloads/Godot_v4.6.3-stable_win64.exe/` — der `.exe`-Name ist ein **Ordner**; die nutzbare
+  Binary ist die `_console.exe` darin (die GUI-Variante liefert headless keine Ausgabe).
+- `CLAUDE.md` → „Engine & Aufruf" auf **zwei Maschinen** umgeschrieben (`$GODOT`-Platzhalter je
+  Plattform, Stolperfallen dokumentiert). Regel Null gilt unverändert.
+- **`--headless --path . --import` auf Windows fehlerfrei** (2107 Assets, keine Skript-Fehler) →
+  Projekt baut auf beiden Maschinen.
+- **`--doctool` verifiziert:** Zielverzeichnis **muss vorher existieren**, sonst „Argument supplied
+  to --doctool must be a valid directory path". Dump = `<out>/doc/classes/*.xml`, 1063 Klassen.
+- **`.gitignore` angelegt, `.godot/` aus der Versionierung entfernt** (4494 von 8908 getrackten
+  Dateien waren Editor-/Import-Cache). *Begründung:* der Cache ist maschinenlokal und wird bei
+  jedem Import neu erzeugt — getrackt produziert er auf dem jeweils anderen Rechner tausende
+  bedeutungslose Diffs und verdeckt echte Änderungen. Die `*.import`-Dateien neben den Assets
+  bleiben versioniert (Godot braucht sie).
+- **`.gitattributes` (`* text=auto eol=lf`)** + repo-lokal `core.autocrlf=false`, `core.eol=lf`.
+  *Begründung:* global ist auf dem Windows-Rechner `core.autocrlf=true`; Godot schreibt LF. Ohne
+  Normalisierung meldet Git 2112 Dateien als geändert, obwohl inhaltlich identisch (verifiziert:
+  `git diff --numstat` zeigte nur `CLAUDE.md`). Binärtypen explizit als `binary` markiert.
+
+**Visuelle Abnahme durch User ✅**
+- Phasen 0–3 im Editor gegengeprüft: Pixelschärfe/Skalierung, Movement-Feel, Schlag-Feel
+  (Hitstop/Knockback/I-Frames), Skelett-Telegraph — **alles in Ordnung, keine Tuning-Änderung
+  gewünscht**. Damit sind die „Feel-Abnahme steht aus"-Punkte aus Phase 0/1/2/3 erledigt.
+- Left/Right-Spalten des SpriteFrames sind **nicht gespiegelt** (Facing korrekt) → Punkt in
+  `docs/assets-todo.md` geschlossen.
+
 ## Nächste Phase
 - **Phase 4 — Figurenwechsel** (nach Go & Fairness-Abnahme): 2 Figuren mit unterschiedlichem
   Movement-/Angriffsgefühl (Kurier = schnell/schwach, Zwerg = langsam/kein Knockback) über je eigene
