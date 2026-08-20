@@ -1,0 +1,83 @@
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://actors/enemy/skeleton.gd" id="1_skeleton"]
+[ext_resource type="Resource" path="res://resources/enemy_skeleton.tres" id="2_stats"]
+[ext_resource type="SpriteFrames" path="res://resources/skeleton_frames.tres" id="3_frames"]
+[ext_resource type="Script" path="res://components/state_machine/state_machine.gd" id="4_statemachine"]
+[ext_resource type="Script" path="res://actors/enemy/states/idle.gd" id="5_idle"]
+[ext_resource type="Script" path="res://actors/enemy/states/approach.gd" id="6_approach"]
+[ext_resource type="Script" path="res://actors/enemy/states/telegraph.gd" id="7_telegraph"]
+[ext_resource type="Script" path="res://actors/enemy/states/attack.gd" id="8_attack"]
+[ext_resource type="Script" path="res://actors/enemy/states/retreat.gd" id="9_retreat"]
+[ext_resource type="Script" path="res://actors/enemy/states/hurt.gd" id="10_hurt"]
+[ext_resource type="Script" path="res://actors/enemy/states/dead.gd" id="11_dead"]
+[ext_resource type="Script" path="res://components/hitbox.gd" id="12_hitbox"]
+[ext_resource type="Script" path="res://components/hurtbox.gd" id="13_hurtbox"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(10, 10)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hitbox"]
+size = Vector2(12, 12)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
+size = Vector2(12, 14)
+
+[node name="Skeleton" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_skeleton")
+stats = ExtResource("2_stats")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = ExtResource("3_frames")
+animation = &"idle_down"
+autoplay = "idle_down"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Hitbox" type="Area2D" parent="."]
+collision_layer = 64
+collision_mask = 8
+monitoring = false
+script = ExtResource("12_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("RectangleShape2D_hitbox")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 32
+collision_mask = 0
+monitorable = true
+monitoring = false
+script = ExtResource("13_hurtbox")
+iframe_duration = 0.15
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("RectangleShape2D_hurtbox")
+
+[node name="StateMachine" type="Node" parent="." node_paths=PackedStringArray("initial_state")]
+script = ExtResource("4_statemachine")
+initial_state = NodePath("Idle")
+
+[node name="Idle" type="Node" parent="StateMachine"]
+script = ExtResource("5_idle")
+
+[node name="Approach" type="Node" parent="StateMachine"]
+script = ExtResource("6_approach")
+
+[node name="Telegraph" type="Node" parent="StateMachine"]
+script = ExtResource("7_telegraph")
+
+[node name="Attack" type="Node" parent="StateMachine"]
+script = ExtResource("8_attack")
+
+[node name="Retreat" type="Node" parent="StateMachine"]
+script = ExtResource("9_retreat")
+
+[node name="Hurt" type="Node" parent="StateMachine"]
+script = ExtResource("10_hurt")
+
+[node name="Dead" type="Node" parent="StateMachine"]
+script = ExtResource("11_dead")

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TuningStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/tuning_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+max_speed = 55.0
+acceleration = 1200.0
+friction = 1600.0
+attack_startup_frames = 3
+attack_active_frames = 6
+attack_recovery_frames = 3
+knockback_speed = 170.0
+knockback_duration = 0.18
+hitstop_frames = 6
+iframe_duration = 0.15
+iframe_blink_interval = 0.05
+attack_buffer_frames = 0
+attack_damage = 1
+max_health = 4
