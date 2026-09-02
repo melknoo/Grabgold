@@ -6,6 +6,9 @@ signal health_changed(current: int, maximum: int)
 ## Dito fuer die Korruption (Phase 5). Der Reif ist weiterreichbar, die Korruption bleibt bei der
 ## Figur — der persistente Wert liegt darum im PartyManager, nicht hier.
 signal corruption_changed(value: float, level: int)
+## Health dieser Figur ist auf 0 — sie faellt aus (Phase 7). Wer darauf reagiert, ist der
+## PartyManager: er haelt den Zustand pro Figur und entscheidet ueber Zwangswechsel/Game Over.
+signal downed
 
 @export var profile: FigureProfile
 
@@ -24,11 +27,22 @@ signal corruption_changed(value: float, level: int)
 ## Animation weiterhin als "attack" (ohne Praefix) abgespielt wird.
 const ANIM_LIBRARY := &""
 
+## Faerbung der Vorwarnung vor dem Zwangsangriff (Stufe 3). Giftig-violett, damit es sich klar
+## vom roten Telegraph des Skeletts unterscheidet — das eine ist eine Drohung von aussen, das
+## andere greift von innen zu.
+const COMPULSION_TINT := Color(0.85, 0.35, 1.0)
+
+## Verweigerter Figurenwechsel (Stufe 4): matt und entfaerbt statt grell — der Reif nimmt etwas
+## weg, er droht nicht.
+const REFUSAL_TINT := Color(0.35, 0.30, 0.45)
+const REFUSAL_FRAMES := 18
+
 var stats: TuningStats
 var facing: StringName = &"down"
 var _attack_buffer_frames_left: int = 0
 var _health: int
 var _corruption: float = 0.0
+var _refusal_frames_left: int = 0
 
 func _ready() -> void:
 	add_to_group(&"player")
@@ -70,19 +84,51 @@ func set_corruption(value: float) -> void:
 func get_corruption() -> float:
 	return _corruption
 
-## Ein Figurenwechsel darf einen laufenden Schlag oder Hitstun nicht abbrechen — sonst wird die
-## Schultertaste zum Cancel-Tool und der Nachteil "langsamer Zwerg" waere folgenlos.
-func can_switch() -> bool:
+## Handlungsfaehig = idle oder move. Ein laufender Schlag, Hitstun und der Dash duerfen weder vom
+## Figurenwechsel noch vom Zwangsangriff (Phase 7) abgebrochen werden — sonst wird beides zum
+## Cancel-Tool und der Nachteil "langsamer Zwerg" waere folgenlos.
+func is_neutral() -> bool:
 	if state_machine == null or state_machine.current_state == null:
 		return false
 	var current: String = state_machine.current_state.name
 	return current == "Idle" or current == "Move"
 
+## Zusaetzlich zur Handlungsfaehigkeit: ab Korruptionsstufe 4 sperrt der Reif den Wechsel.
+func can_switch() -> bool:
+	return is_neutral() and not (reif != null and reif.switch_locked())
+
+## Faerbung waehrend der Vorwarnung des Zwangsangriffs. Nur RGB — der Alphakanal gehoert der
+## Hurtbox (I-Frame-Blinken), beide wuerden sich sonst gegenseitig ueberschreiben.
+func set_compulsion_tint(on: bool) -> void:
+	set_sprite_tint(COMPULSION_TINT if on else Color.WHITE)
+
+func set_sprite_tint(c: Color) -> void:
+	sprite.modulate = Color(c.r, c.g, c.b, sprite.modulate.a)
+
+## Kurzer, matter Flash: der Reif laesst die Figur nicht los (Korruptionsstufe 4). Sonst waere ein
+## verweigerter Wechsel voellig stumm und saehe wie ein hakender Tastendruck aus.
+func flash_refusal() -> void:
+	_refusal_frames_left = REFUSAL_FRAMES
+
+## Der Zwangsangriff hat Vorrang: er ist das dringendere Signal und faerbt ohnehin jeden Frame.
+func _tick_refusal_tint() -> void:
+	if _refusal_frames_left <= 0:
+		return
+	_refusal_frames_left -= 1
+	if reif != null and reif.is_compelled():
+		return
+	set_sprite_tint(REFUSAL_TINT if (_refusal_frames_left / 3) % 2 == 0 else Color.WHITE)
+	if _refusal_frames_left == 0:
+		set_sprite_tint(Color.WHITE)
+
 func _on_hurt(damage: int, knockback: Vector2) -> void:
 	set_health(_health - damage)
 	if _health == 0:
-		# Phase-3/4: kein echtes Game-Over — Health wird resettet.
-		set_health(stats.max_health)
+		# Phase 7: kein Health-Reset mehr. Die Figur faellt aus; der PartyManager wechselt
+		# zwangsweise auf die naechste und meldet Game Over, wenn keine mehr steht. Bewusst KEIN
+		# Hurt-State: diese Figur verlaesst das Feld, ein Knockback an ihr waere folgenlos.
+		downed.emit()
+		return
 	state_machine.transition_to(&"hurt", {"knockback": knockback * stats.knockback_taken_scale})
 
 func facing_vector() -> Vector2:
@@ -98,6 +144,7 @@ func _physics_process(_delta: float) -> void:
 		_attack_buffer_frames_left = stats.attack_buffer_frames
 	elif _attack_buffer_frames_left > 0:
 		_attack_buffer_frames_left -= 1
+	_tick_refusal_tint()
 
 func consume_attack() -> bool:
 	if _attack_buffer_frames_left > 0:

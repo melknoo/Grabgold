@@ -12,6 +12,13 @@ extends Node
 ## Wechsel ueberleben, weil der Reif weitergereicht wird und Korruption extrem langsam abbaut.
 
 signal figure_switched(index: int, profile: FigureProfile)
+## Eine Figur ist ausgefallen (0 HP). Sie bleibt draussen, bis der Raum neu startet.
+signal figure_downed(index: int, profile: FigureProfile)
+## Keine Figur steht mehr — Game Over. Wer darauf reagiert, ist der Bootstrap (scenes/main.gd).
+signal party_wiped
+## Ein Wechsel wurde verweigert, weil der Reif ihn sperrt (Korruptionsstufe 4). Ohne dieses Signal
+## waere die Sperre voellig stumm — man druecke Q und nichts passiert, was wie ein Bug aussieht.
+signal switch_refused
 
 @export var figures: Array[FigureProfile] = []
 @export var player: Player
@@ -37,6 +44,7 @@ func _ready() -> void:
 	var start: int = figures.find(player.profile)
 	_index = start if start >= 0 else 0
 	_activate(_index, false)
+	player.downed.connect(_on_player_downed)
 
 func _physics_process(_delta: float) -> void:
 	if Input.is_action_just_pressed(&"switch_figure"):
@@ -45,11 +53,61 @@ func _physics_process(_delta: float) -> void:
 func switch_next() -> void:
 	if figures.size() < 2 or player == null:
 		return
-	if not player.can_switch():
+	if not player.is_neutral():
 		return
+	if not player.can_switch():
+		# Handlungsfaehig, aber der Reif sperrt (Stufe 4) -> das ist eine Aussage, kein Nichts.
+		player.flash_refusal()
+		switch_refused.emit()
+		return
+	var next: int = _next_standing(_index)
+	if next < 0:
+		return  # niemand sonst steht mehr
 	_health[_index] = player.get_health()
 	_corruption[_index] = player.get_corruption()
-	_activate((_index + 1) % figures.size(), true)
+	_activate(next, true)
+
+## Die aktive Figur ist auf 0 HP. Sie bleibt draussen — es gibt keinen Health-Reset mehr.
+func _on_player_downed() -> void:
+	_health[_index] = 0
+	_corruption[_index] = player.get_corruption()
+	var fallen: int = _index
+	figure_downed.emit(fallen, figures[fallen])
+	var next: int = _next_standing(fallen)
+	if next < 0:
+		party_wiped.emit()
+		return
+	# Zwangswechsel: umgeht `can_switch()` bewusst. Die Sperre schuetzt einen laufenden Schlag und
+	# haelt ab Stufe 4 den Fluch fest — aber eine ausgefallene Figur MUSS weichen, sonst haette
+	# Korruptionsstufe 4 ein totes Spiel zur Folge.
+	_activate(next, true)
+
+## Naechste Figur im Kreis, die noch steht. -1 = keine mehr. `-1` in `_health` heisst
+## "noch nie aktiv gewesen" und zaehlt als stehend.
+func _next_standing(from: int) -> int:
+	for step in range(1, figures.size()):
+		var idx: int = (from + step) % figures.size()
+		if _health[idx] != 0:
+			return idx
+	return -1
+
+func is_downed(index: int) -> bool:
+	return index < _health.size() and _health[index] == 0
+
+func standing_count() -> int:
+	var n: int = 0
+	for hp: int in _health:
+		if hp != 0:
+			n += 1
+	return n
+
+## Vollstaendiger Reset des Ensembles (Raum-Neustart nach Game Over). Auch die Korruption faellt
+## auf 0 — sonst startet man neu und ist sofort wieder auf Stufe 4.
+func revive_all() -> void:
+	for i in _health.size():
+		_health[i] = -1
+		_corruption[i] = 0.0
+	_activate(0, true)
 
 ## `reset_state` false = Initialisierung (Player steht schon), true = echter Wechsel.
 func _activate(index: int, reset_state: bool) -> void:

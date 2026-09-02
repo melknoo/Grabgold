@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/rooms/room_01.tscn" id="2_room"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://resources/figure_profile.gd" id="6_profile"]
 [ext_resource type="Resource" path="res://resources/figure_kurier.tres" id="7_kurier"]
 [ext_resource type="Resource" path="res://resources/figure_zwerg.tres" id="8_zwerg"]
+[ext_resource type="PackedScene" path="res://ui/game_over/game_over.tscn" id="10_gameover"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -19,6 +20,8 @@ script = ExtResource("1_main")
 position = Vector2(56, 264)
 
 [node name="CorruptionOverlay" parent="." instance=ExtResource("9_corruption")]
+
+[node name="GameOverFade" parent="." instance=ExtResource("10_gameover")]
 
 [node name="DebugOverlay" parent="." instance=ExtResource("4_overlay")]
 

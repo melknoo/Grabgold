@@ -6,12 +6,28 @@ extends Node2D
 ## Integer-Scaling aus Phase 0. Die ist vom User abgenommen, der Code ist damit erledigt und
 ## ersatzlos raus. Jetzt setzt der Bootstrap den Spieler in den Raum und richtet die Kamera aus.
 
+## Game Over startet den Raum neu. Die Testszenen setzen das auf `false`, BEVOR ein Physik-Frame
+## laeuft: sie haengen main.tscn als Kind unter sich, und `reload_current_scene()` wuerde dort
+## nicht den Raum, sondern den Test selbst neu starten — eine Endlosschleife.
+@export var restart_on_wipe: bool = true
+
 @onready var room: Room = $Room01
 @onready var player: Player = $Player
+@onready var party: PartyManager = $PartyManager
+@onready var game_over: GameOverFade = $GameOverFade
 
 func _ready() -> void:
 	player.global_position = room.spawn_point()
 	_apply_camera_limits()
+	party.party_wiped.connect(_on_party_wiped)
+	game_over.fade_finished.connect(_on_fade_finished)
+
+func _on_party_wiped() -> void:
+	game_over.start()
+
+func _on_fade_finished() -> void:
+	if restart_on_wipe:
+		get_tree().reload_current_scene()
 
 ## Die Kamera darf nie ueber die Aussenwand hinausschauen. Smoothing bleibt aus (CLAUDE.md >
 ## Auflösung & Look): es erzeugt Sub-Pixel-Kamerapositionen und damit Tile-Seams — genau die

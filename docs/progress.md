@@ -519,6 +519,96 @@ Arena aber genauso gut umlaufen konnte.
   9-Slice-Rahmen aus `TilesetWallSimple.png` lägen dafür bereit.
 - **Kein echtes Game-Over** (unverändert seit Phase 3).
 
+## Phase 7 — Korruption zu Ende gebaut ✅ (2026-09-02)
+
+**Anlass (User-Entscheidung):** Der Reif ist die Kernmechanik („die beste Mechanik im Spiel ist
+die, die den Spieler frisst"), hatte aber kaum einen Nachteil. Stufe 1 war eine Vignette, Stufe 2
+ein leichter Dash-Drift — die Stufen 3 und 4 wurden vom Zähler gestützt, hingen aber an nichts.
+Dazu gab es **kein Game-Over**: bei 0 HP wurde die Health stumm zurückgesetzt. Das war die
+größte Lücke zwischen Entwurf und Gebautem, und sie zahlt direkt aufs Kampfgefühl ein.
+
+**Stufe 3 — der Reif schlägt von selbst zu**
+- Ab Stufe 3 löst der Reif mit `compulsion_per_second` (0.6/s) einen Angriff aus, den der Spieler
+  nicht bestellt hat. Erst `compulsion_tell_frames` (10 F) **Vorwarnung** — der Sprite flackert
+  giftig-violett —, dann der Schlag.
+- *Warum ein Tell, anders als beim Dash-Drift:* der Drift ist bewusst unangekündigt, weil ein
+  Stück weiter zu dashen harmlos ist. Ein Angriff aus dem Nichts kostet dagegen Positionierung
+  und öffnet den Spieler für Treffer — ohne Tell liest er sich als kaputte Eingabe statt als
+  Fluch. Die 10 Frames reichen zum Umpositionieren, aber nicht zum Abbestellen. (User-Entscheidung.)
+- Violett bewusst **nicht rot**: Rot ist seit Phase 3 der Telegraph des Skeletts. Das eine ist
+  eine Drohung von außen, das andere greift von innen zu.
+
+**Stufe 4 — der Reif lässt die Figur nicht los**
+- `Player.can_switch()` ist ab Stufe 4 false. Bis dahin durfte man den Fluch auf die nächste
+  Figur abwälzen; ab hier sitzt man auf dem, was man sich geholt hat. Ausweg: abwarten
+  (0.4/s Abbau, ~20 s von 100 auf unter 92).
+- **Nicht stumm:** ein verweigerter Wechsel meldet `switch_refused` und lässt die Figur kurz matt
+  aufflackern (`REFUSAL_TINT`, 18 F). Ohne das sähe die Sperre wie ein hakender Tastendruck aus.
+  Die Vignette taugte dafür nicht — sie schlägt auf Stufe 4 ohnehin schon fast voll aus.
+
+**Todesmodell — das Ensemble trägt (User-Entscheidung)**
+- Bei 0 HP fällt **diese** Figur aus und bleibt draußen; der `PartyManager` wechselt zwangsweise
+  auf die nächste stehende. Erst wenn keine mehr steht: `party_wiped` → Schwarzblende
+  (`ui/game_over/`, 60 F) → Raum-Neustart.
+- Damit ist der Figurenwechsel jetzt **drei** Dinge: Kampf-Achse (Phase 4), Puzzle-Verb (Phase 6)
+  und Lebensvorrat (Phase 7). Der `PartyManager` hielt Health ohnehin schon pro Figur — es kam
+  kein neuer Zustandsbehälter dazu.
+- Die Korruption bleibt bei der ausgefallenen Figur (unverändertes Modell aus Phase 5).
+
+**Architekturentscheidungen (mit Begründung)**
+- *Der Zwangsangriff ist kein Cancel-Tool:* er feuert nur aus `idle`/`move` und **fällt aus**,
+  wenn die Figur während der Vorwarnung getroffen wird oder dasht. Sonst würde der Reif Hitstun
+  canceln — exakt die Invariante, die seit Phase 4 den Figurenwechsel auf idle/move beschränkt.
+  Dafür wurde `Player.can_switch()` in `is_neutral()` (Zustandsfrage) und `can_switch()`
+  (Zustandsfrage **plus** Reif-Sperre) aufgeteilt; beide Aufrufer nutzen jetzt das Passende.
+- *Der Zwangswechsel nach einem Ausfall umgeht `can_switch()` bewusst.* Die Sperre schützt einen
+  laufenden Schlag und hält ab Stufe 4 den Fluch fest — aber eine ausgefallene Figur **muss**
+  weichen. Ohne diese Ausnahme wäre Stufe 4 bei 0 HP ein totes Spiel.
+- *`revive_all()` setzt auch die Korruption zurück.* Sonst startet man nach dem Game Over neu und
+  steht sofort wieder auf Stufe 4 — ein Neustart, der sich nicht wie einer anfühlt.
+- *Tell-Färbung nur über RGB:* der Alphakanal des Sprites gehört der Hurtbox (I-Frame-Blinken).
+  Beide auf `modulate` loszulassen hätte sie einander überschreiben lassen.
+- *`restart_on_wipe` als `@export` auf `main.gd`:* die Testszenen hängen `main.tscn` als **Kind**
+  unter sich — `reload_current_scene()` würde dort den Test neu starten statt den Raum, also eine
+  Endlosschleife. Der Schalter wird im Sim vor dem ersten Physik-Frame auf `false` gesetzt.
+
+**Verifikation (headless, `tests/phase7_sim.*`, 34/34 grün)**
+- **Stufe 3:** Vorwarnung läuft, danach schlägt die Figur ohne Eingabe zu; unter Stufe 3 passiert
+  das in 60 Frames nie. Wird die Figur während der Vorwarnung in den Hurt-State geworfen, **fällt
+  der Zwang aus** und der Hitstun bleibt unangetastet.
+- **Stufe 4:** `switch_locked()` greift, `can_switch()` ist trotz idle false, der Wechsel wird
+  verweigert **und gemeldet**; eine Stufe darunter geht er wieder.
+- **Todesmodell:** Ausfall wird gemeldet, Zwangswechsel auf die nächste Figur, die neue startet
+  voll; ausgefallene Figuren werden vom freiwilligen Wechsel übersprungen; kein Game Over,
+  solange jemand steht.
+- **Game Over:** bei der zweiten ausgefallenen Figur `party_wiped`, Blende läuft an und ist nach
+  `fade_frames` voll schwarz. `revive_all()` stellt Health, Korruption (auch der inaktiven Figur)
+  und die Blende wieder her.
+- **Regression:** phase4 27/27, phase5 51/51, phase6 26/26 weiterhin grün.
+- **Fensterlauf** (240 Frames, Vulkan/Forward+) fehlerfrei.
+
+**Merker für künftige Tests (beim Bau dieses Sims aufgelaufen)**
+- **GDScript-Lambdas fangen lokale Variablen `by value`.** Ein `signal.connect(func(): flag = true)`
+  auf eine *lokale* Variable setzt nichts, was der Aufrufer je sieht — Signal-Mitschriften
+  gehören in **Member**-Variablen. Drei Checks waren aus genau diesem Grund still falsch.
+- **Korruption exakt auf eine Schwelle zu setzen reicht nicht:** der Abbau (0.4/s) drückt den Wert
+  schon im nächsten Frame darunter. Im Test mit kleinem Aufschlag setzen.
+- **I-Frames überleben den Figurenwechsel** (Phase 4, gleicher Node). Zwei Todesstöße kurz
+  hintereinander prallen am zweiten stumm ab — im Test auf das Ende der I-Frames warten.
+
+**Offen / bekannte Punkte**
+- **Feel-Abnahme beim User steht aus:** Ist die Vorwarnung von 10 Frames lang genug, um zu
+  reagieren, und kurz genug, um zu erschrecken? Ist `compulsion_per_second = 0.6` zu häufig?
+  Fühlt sich die Wechselsperre wie eine Falle an oder nur wie ein genervtes „geht nicht"?
+  Alle drei Achsen liegen in `resources/reif.tres`.
+- **Kein Game-Over-Bildschirm** — nur Blende und Neustart. Kein Text, kein „nochmal?"-Prompt.
+- **Der Raum startet komplett neu** (`reload_current_scene`), inklusive Tür und Skelett. Es gibt
+  keinen Checkpoint und keinen Fortschritt, der einen Neustart überlebt.
+- **Nur zwei Figuren = zwei Leben.** Der Lebensvorrat skaliert mit der Ensemble-Größe; mit den
+  geplanten vier Figuren wird Phase 7 deutlich milder. Das ist eine Balance-Achse, die beim
+  Hinzufügen einer Figur mitbedacht werden muss.
+- Stufen 1 und 2 (Vignette, Drift) sind weiterhin **nicht vom User abgenommen** (siehe Phase 5).
+
 ## Nächste Phase
-- Offen. Kandidaten aus den bekannten Punkten: Raumwechsel/Ziel, Audio-Infrastruktur (Flüstern
-  für Korruptionsstufe 1), Korruptionsstufen 3 und 4 verdrahten, Game-Over.
+- Offen. Kandidaten: Raumwechsel/Ziel, Audio-Infrastruktur (Flüstern für Korruptionsstufe 1),
+  Game-Over-Bildschirm, weitere Figuren (mit Blick auf die Lebensvorrats-Balance oben).

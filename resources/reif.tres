@@ -15,3 +15,5 @@ corruption_decay_per_second = 0.4
 level_thresholds = Array[float]([25.0, 55.0, 75.0, 92.0])
 drift_chance = 0.22
 drift_scale = 1.5
+compulsion_per_second = 0.6
+compulsion_tell_frames = 10

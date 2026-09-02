@@ -123,6 +123,7 @@ actors/enemy/       enemy.tscn/.gd + states/{idle,approach,telegraph,attack,retr
 actors/props/       door.tscn/.gd + pressure_plate.tscn/.gd (Raum-Interaktion, Phase 6)
 ui/debug_overlay/   debug_overlay.tscn/.gd
 ui/corruption_overlay/  Vignette fuer Korruptionsstufe 1 (.tscn/.gd/.gdshader)
+ui/game_over/       Schwarzblende beim Game Over (Phase 7)
 scenes/             main.tscn (Bootstrap) + rooms/room_01.tscn + rooms/room_01_tiles.tscn (generiert)
 tools/              Godot-Tool-Skripte, die Resources/Settings generieren (nie von Hand editieren)
 tests/              headless Verifikations-Szenen (*_sim.tscn/.gd)
@@ -171,10 +172,16 @@ Zeitdehnung/Hitstop **niemals** über `Engine.time_scale` (träfe UI + Partikel)
   Schadensbonus unerreichbar.
 - **Korruption liegt pro Figur im `PartyManager`** (wie Health), nicht im Player: der Reif ist
   weiterreichbar, die Korruption bleibt bei der Figur und baut extrem langsam ab.
-- **Korruptionsstufen:** 1 = entsättigte Bildschirmränder (`ui/corruption_overlay/`, Shader liest
-  per `hint_screen_texture`), 2 = Dash trägt gelegentlich weiter als eingegeben (ohne eigenes
-  Feedback — soll wie ein Bug wirken). Stufen 3 und 4 sind vom Zähler gestützt, aber **nicht
-  verdrahtet**.
+- **Korruptionsstufen (seit Phase 7 alle vier verdrahtet):**
+  1 = entsättigte Bildschirmränder (`ui/corruption_overlay/`, Shader liest per
+  `hint_screen_texture`); 2 = Dash trägt gelegentlich weiter als eingegeben (**ohne** eigenes
+  Feedback — soll wie ein Bug wirken); 3 = der Reif **schlägt von selbst zu** (Vorwarnung per
+  Sprite-Flackern, dann Zwangsangriff); 4 = **Figurenwechsel gesperrt**.
+- **Zwei Invarianten der hohen Stufen:** Der Zwangsangriff feuert nur aus `idle`/`move`
+  (`Player.is_neutral()`) und fällt aus, wenn die Figur während der Vorwarnung getroffen wird —
+  der Reif ist **kein Cancel-Tool**, dieselbe Regel wie beim Figurenwechsel. Und Stufe 4 sperrt
+  nur den *freiwilligen* Wechsel: der Zwangswechsel nach einem Ausfall umgeht sie, sonst wäre
+  Stufe 4 bei 0 HP ein totes Spiel.
 
 ## State-Machine (generisch) & Gegner-KI
 
@@ -227,6 +234,22 @@ Profil-`.tres` schreiben, in `PartyManager.figures` eintragen — **kein Code**.
   **Zeile = Frame**. Gilt für NinjaGreen (32×32) *und* `Actor/Character/*` (16×16).
   Achtung: `Actor/Character/*` hat nur **1 Attack-Frame** (Sheet 64×16), NinjaGreen hat 4.
 
+## Tod & Ensemble (Phase 7)
+
+Bis Phase 6 gab es **kein Game-Over** — bei 0 HP wurde die Health zurückgesetzt.
+
+- **Bei 0 HP fällt die Figur aus** und bleibt draußen (`_health[i] == 0` im `PartyManager`).
+  `Player` emittiert `downed`, der `PartyManager` wechselt **zwangsweise** auf die nächste
+  stehende Figur. Steht keine mehr → `party_wiped`.
+- Damit ist der Figurenwechsel **drei** Dinge: Kampf-Achse (Phase 4), Puzzle-Verb (Phase 6) und
+  Lebensvorrat (Phase 7). Die Korruption bleibt bei der ausgefallenen Figur.
+- **Game Over** = `ui/game_over/` blendet in `fade_frames` (60 F) schwarz, danach startet
+  `scenes/main.gd` den Raum neu (`reload_current_scene`). `main.gd` hat dafür
+  `restart_on_wipe` — **die Testszenen setzen das auf `false`**, weil sie `main.tscn` als Kind
+  hängen und ein Reload sonst den Test selbst neu startete.
+- `PartyManager.revive_all()` setzt Health **und Korruption** zurück. Ohne den Korruptions-Reset
+  startete man neu und stünde sofort wieder auf Stufe 4.
+
 ## Der Raum (Phase 6)
 
 `scenes/rooms/room_01.tscn` ist der erste echte Raum: 40×24 Tiles = **640×384 px**, exakt der
@@ -254,8 +277,10 @@ doppelte Viewport — erst dadurch hat die Kamera einen Zweck.
 - `$GODOT --headless --path . res://tests/phase4_sim.tscn` — Figurenwechsel (27 Checks).
 - `$GODOT --headless --path . res://tests/phase5_sim.tscn` — Reif (51 Checks).
 - `$GODOT --headless --path . res://tests/phase6_sim.tscn` — Raum, Platte, Tür, Kamera (26 Checks).
+- `$GODOT --headless --path . res://tests/phase7_sim.tscn` — Korruptionsstufen 3/4, Ausfall,
+  Game Over (34 Checks).
 
-Alle drei müssen „ALLES GRUEN" melden.
+Alle vier müssen „ALLES GRUEN" melden.
 
 Tests laufen als **Szene**, nicht per `--script`: bei `--script` registriert Godot die Autoloads
 nicht, und `Hitbox`/`Hurtbox` referenzieren `Debug` → Compile-Error vor dem ersten Check.

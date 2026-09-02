@@ -29,8 +29,8 @@ extends Resource
 ## (Kickoff). 0.4 -> 250 s von voll auf leer. Der Spieler MUSS den Schaden auf seine Leute
 ## verteilen; wer das aendert, nimmt der Mechanik den Preis.
 @export var corruption_decay_per_second: float = 0.4
-## Schwellen fuer Stufe 1..4. Phase 5 verdrahtet Feedback nur fuer 1 (Vignette) und 2 (Dash-Drift);
-## 3 (schlaegt von selbst zu) und 4 (Wechsel gesperrt) sind vom Zaehler gestuetzt, aber inaktiv.
+## Schwellen fuer Stufe 1..4. Seit Phase 7 sind alle vier verdrahtet: 1 Vignette, 2 Dash-Drift,
+## 3 Zwangsangriff, 4 Figurenwechsel gesperrt.
 @export var level_thresholds: Array[float] = [25.0, 55.0, 75.0, 92.0]
 
 @export_group("Stufe 2 — Dash-Drift")
@@ -38,3 +38,12 @@ extends Resource
 ## anfuehlen, nicht wie eine Strafe — darum selten und ohne eigenes Feedback.
 @export_range(0.0, 1.0, 0.01) var drift_chance: float = 0.22
 @export var drift_scale: float = 1.5
+
+@export_group("Stufe 3 — Zwangsangriff")
+## Wahrscheinlichkeit pro Sekunde, dass der Reif ab Stufe 3 selbst zuschlaegt. 0.6 -> im Schnitt
+## alle ~1.7 s, aber nur solange die Figur ueberhaupt handlungsfaehig ist (idle/move).
+@export_range(0.0, 5.0, 0.05) var compulsion_per_second: float = 0.6
+## Vorwarnung in Frames: der Sprite flackert, DANN schlaegt die Figur. Anders als der Dash-Drift
+## (Stufe 2, bewusst unangekuendigt) kostet ein Angriff aus dem Nichts Positionierung und oeffnet
+## den Spieler fuer Treffer — ohne Tell liest sich das als kaputte Eingabe statt als Fluch.
+@export var compulsion_tell_frames: int = 10

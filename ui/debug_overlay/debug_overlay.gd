@@ -24,7 +24,7 @@ func _process(_dt: float) -> void:
 	var reif: Reif = _player.reif
 	label.text = (
 		"FPS: %d\nFigur: %s  HP: %d/%d  Gewicht: %.1f\nState: %s\nFacing: %s\nAnim: %s [%d]\n"
-		+ "REIF: %s  Stufe %d\nKorruption: %.1f %%\nDash-CD: %d  Phasing: %s\n"
+		+ "REIF: %s  Stufe %d%s\nKorruption: %.1f %%\nDash-CD: %d  Phasing: %s\n"
 		+ "Raum: %s\nDebugBoxes: %s"
 	) % [
 		Engine.get_frames_per_second(),
@@ -37,12 +37,24 @@ func _process(_dt: float) -> void:
 		_player.sprite.frame,
 		"AN" if reif.is_channeling() else "aus",
 		reif.level(),
+		_reif_flags(reif),
 		100.0 * _player.get_corruption() / reif.stats.corruption_max,
 		reif.dash_cooldown_left(),
 		str(reif.is_phasing()),
 		_room_text(),
 		str(Debug.show_boxes),
 	]
+
+
+## Was die hohen Korruptionsstufen gerade tun (Phase 7). Ohne das sieht ein Zwangsangriff wie
+## ein Eingabefehler aus und eine gesperrte Taste wie ein Bug.
+func _reif_flags(reif: Reif) -> String:
+	var flags: Array[String] = []
+	if reif.is_compelled():
+		flags.append("ZWANG")
+	if reif.switch_locked():
+		flags.append("WECHSEL GESPERRT")
+	return ("  " + " · ".join(flags)) if not flags.is_empty() else ""
 
 
 ## Platte + Tuer in einer Zeile — die beiden Werte, an denen die Feel-Abnahme von Phase 6 haengt

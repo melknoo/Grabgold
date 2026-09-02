@@ -26,6 +26,8 @@ var _dash_cooldown_left: int = 0
 var _slowed: Array[Node] = []
 ## Nach dem Dash wird die player_body-Maske NICHT sofort zurueckgesetzt (siehe _restore_body_mask).
 var _mask_restore_pending: bool = false
+## Restframes der Vorwarnung des Zwangsangriffs (Stufe 3). 0 = kein Zwang unterwegs.
+var _tell_frames_left: int = 0
 
 func _ready() -> void:
 	_player = get_parent() as Player
@@ -47,6 +49,8 @@ func _physics_process(delta: float) -> void:
 	else:
 		_clear_time_dilation()
 		_tick_corruption(-stats.corruption_decay_per_second * delta)
+	# Nach dem Korruptions-Tick, damit eine gerade erreichte Stufe sofort greift.
+	_tick_compulsion(delta)
 
 func is_channeling() -> bool:
 	return _channeling
@@ -121,6 +125,38 @@ func _restore_body_mask() -> void:
 		return  # steckt noch in einem Gegner -> naechsten Frame erneut versuchen
 	_player.set_collision_mask_value(3, true)
 	_mask_restore_pending = false
+
+## Ab Korruptionsstufe 4 nimmt der Reif dem Spieler den Ausweg: die Figur kann nicht mehr
+## gewechselt werden. Genau DAS ist der Preis der Mechanik — bis dahin durfte man den Fluch auf
+## die naechste Figur abwaelzen (Phase 4/5), ab hier sitzt man auf dem, was man sich geholt hat.
+## Der einzige Weg heraus ist Abwarten (0.4/s Abbau) — oder auszufallen, denn ein Zwangswechsel
+## nach dem Ausknocken umgeht die Sperre bewusst (siehe PartyManager).
+func switch_locked() -> bool:
+	return level() >= 4
+
+## Laeuft gerade die Vorwarnung eines Zwangsangriffs (Stufe 3)?
+func is_compelled() -> bool:
+	return _tell_frames_left > 0
+
+## Stufe 3: der Reif schlaegt von selbst zu. Erst Vorwarnung (Sprite-Flackern), dann der Schlag —
+## der Spieler kann in dem Fenster noch die Position aendern, den Schlag aber nicht abbestellen.
+func _tick_compulsion(delta: float) -> void:
+	if _tell_frames_left > 0:
+		_tell_frames_left -= 1
+		_player.set_compulsion_tint((_tell_frames_left / 2) % 2 == 0)
+		if _tell_frames_left > 0:
+			return
+		_player.set_compulsion_tint(false)
+		# Wurde die Figur waehrend der Vorwarnung getroffen oder dasht sie, faellt der Zwang aus.
+		# Sonst wuerde der Reif Hitstun canceln — und ein Cancel-Tool ist er ausdruecklich nicht
+		# (dieselbe Invariante, die den Figurenwechsel auf idle/move beschraenkt).
+		if _player.is_neutral():
+			_player.state_machine.transition_to(&"attack")
+		return
+	if level() < 3 or not _player.is_neutral():
+		return
+	if rng.randf() < stats.compulsion_per_second * delta:
+		_tell_frames_left = maxi(stats.compulsion_tell_frames, 1)
 
 func _tick_corruption(amount: float) -> void:
 	if is_zero_approx(amount):
