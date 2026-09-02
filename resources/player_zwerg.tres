@@ -20,3 +20,5 @@ iframe_blink_interval = 0.06
 attack_buffer_frames = 6
 attack_damage = 2
 max_health = 9
+weight = 3.0
+corruption_gain_scale = 0.7

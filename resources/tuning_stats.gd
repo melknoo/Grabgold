@@ -48,3 +48,16 @@ extends Resource
 @export_group("Combat Numbers")
 @export var attack_damage: int = 1
 @export var max_health: int = 6
+
+@export_group("World (Phase 6)")
+## Gewicht der Figur fuer Druckplatten. KEIN Physik-Wert — eine reine Puzzle-Achse, die den
+## Figurenwechsel vom Kampf- zum Raum-Verb macht (Kurier 1.0 loest nichts aus, Zwerg 3.0 schon).
+## Bewusst float statt bool/enum: Zwischenstufen sind tunebar, und kuenftige Figuren ordnen sich
+## ein, ohne dass eine Zeile Platten-Code angefasst wird.
+@export var weight: float = 1.0
+
+@export_group("Reif (Phase 5)")
+## Faktor auf die Korruptions-Aufladung dieser Figur. Die einzige Reif-Achse, die pro Figur
+## unterschiedlich ist — alle uebrigen Werte stehen im reif.tres, weil der Reif EIN Gegenstand
+## ist. 1.0 = Standard (Kurier), < 1.0 = haelt den Fluch laenger aus (Zwerg).
+@export var corruption_gain_scale: float = 1.0

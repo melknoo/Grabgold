@@ -12,7 +12,10 @@
 - **Attributionspflicht:** **nein** (Pack-README: „Attribution is not required but appreciated").
 - **Freiwillige Attribution (eingeplant, im Abspann):**
   > „Ninja Adventure Asset Pack" by Pixel-boy and AAA — CC0.
-- **Verwendet für:** Spieler (NinjaGreen), Terrain-Tiles, FX; ggf. Gegner/Items in späteren Phasen.
+- **Verwendet für:** Spieler (NinjaGreen), Zwerg (Knight), Gegner (Skelett) und ab Phase 6 der
+  Raum: `Backgrounds/Tilesets/Interior/TilesetInteriorFloor.png` (Boden + Wand,
+  → `resources/tileset_room.tres`) sowie `Backgrounds/Tilesets/TilesetDungeon.png`
+  (Tür- und Druckplatten-Sprites).
 - **Abgelegt unter:** `assets/external/Ninja Adventure - Asset Pack/`
 - **Eingebunden am:** 2026-08-20
 

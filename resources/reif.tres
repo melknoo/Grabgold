@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ReifStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/reif_stats.gd" id="1_reif"]
+
+[resource]
+script = ExtResource("1_reif")
+time_scale = 0.55
+damage_multiplier = 1.75
+dash_speed = 320.0
+dash_frames = 10
+dash_cooldown_frames = 18
+corruption_max = 100.0
+corruption_per_second = 9.0
+corruption_decay_per_second = 0.4
+level_thresholds = Array[float]([25.0, 55.0, 75.0, 92.0])
+drift_chance = 0.22
+drift_scale = 1.5

@@ -18,7 +18,9 @@ func _ready() -> void:
 	add_child(main)
 	var player: Player = main.get_node("Player")
 	var party: PartyManager = main.get_node("PartyManager")
-	var skeleton: Node2D = main.get_node("Skeleton")
+	# Ab Phase 6 liegt das Skelett im Raum (scenes/rooms/room_01.tscn), nicht mehr direkt
+	# unter Main. Rekursiv suchen, damit der Test kuenftige Umbauten der Szene ueberlebt.
+	var skeleton: Node2D = main.find_child("Skeleton", true, false)
 	# Skelett aus dem Weg, damit es die Messungen nicht stoert.
 	skeleton.position = Vector2(3000, 3000)
 	await physics(3)

@@ -258,9 +258,267 @@
 - Nur 2 der 4 geplanten Figuren existieren. Weitere = je ein `figure_*.tres` + Eintrag in
   `PartyManager.figures`.
 
+## Phase 5 — Der Reif ✅ (2026-09-01)
+
+**Befund vorab: die Körper waren gar nicht solide**
+- `player.tscn` hatte `collision_mask = 1` (nur `environment`), `skeleton.tscn` ebenfalls. Spieler
+  und Skelett liefen bis Phase 4 ungehindert durcheinander hindurch. Die CLAUDE.md-Vorschrift für
+  den Phase-Dash („`player_body`-Mask um Bit 3 kürzen") wäre damit ein **No-Op** gewesen und der
+  Dash bedeutungslos.
+- Darum als Voraussetzung: Player-Mask auf `5` (environment + enemy_body), Skelett-Mask auf `3`
+  (environment + player_body). **Symmetrisch** — einseitig hätte der Gegner den Spieler geschoben,
+  ohne selbst gebremst zu werden. Die Collision-Matrix in CLAUDE.md ist entsprechend aktualisiert.
+- Das ist eine bewusste **Feel-Änderung an Phase 3/4** (man kann nicht mehr durch das Skelett
+  laufen) und steht unter Vorbehalt der User-Abnahme. Phase-4-Sim danach erneut gelaufen: 27/27 grün.
+
+**Erledigt**
+- **Zeitdehnung als Duty-Cycle im `HitstopManager`** (`set_time_scale`/`clear_time_scale`/
+  `time_scale_for`): ein Akkumulator lässt den Ziel-Node nur jeden n-ten Frame laufen
+  (`process_mode` INHERIT/DISABLED). Faktor 0.55 = 55 % der Ticks.
+- **`ReifStats`** (`resources/reif_stats.gd` + `reif.tres`) mit allen Reif-Werten; `TuningStats`
+  um genau ein Feld erweitert: `corruption_gain_scale` (Kurier 1.0, Zwerg 0.7).
+- **`Reif`-Node** (`actors/player/reif.gd`) am Player: Kanal-Input, Korruptions-Tick, Registrierung
+  der Zeitdehnung, Schadensfaktor, Dash-Freigabe/-Cooldown, Maskenwiederherstellung.
+- **`Dash`-State** (`actors/player/states/dash.gd`), aus `idle`/`move` erreichbar und nur bei
+  gehaltenem Reif. Kürzt die Body-Maske um Bit 3, setzt die Hurtbox aus, Facing bleibt gesperrt.
+- **Korruption pro Figur im `PartyManager`** (`_corruption`, index-parallel zu `_health`), gesichert
+  und wiederhergestellt beim Wechsel; `Player.set_corruption`/`corruption_changed` analog zu Health.
+- **Stufe 1** = `ui/corruption_overlay/` — ColorRect mit Shader, der die Szene per
+  `hint_screen_texture` liest und sie zum Bildrand hin entsättigt und abdunkelt. Intensität an den
+  Korruptionswert gekoppelt, mit sichtbarer Grundstärke 0.25 direkt an der Schwelle.
+- **Stufe 2** = Dash-Drift: ab Stufe 2 trägt der Dash mit `drift_chance` um `drift_scale` weiter
+  als eingegeben. Bewusst ohne eigenes Feedback.
+- **Input-Actions** `reif_channel` und `dash` per `tools/add_input_actions.gd` angelegt
+  (neuer `_axis()`-Helper für den Gamepad-Trigger).
+- **Debug-Overlay** um Figur, HP, REIF-Status, Stufe, Korruption in %, Dash-Cooldown und Phasing
+  ergänzt — Figur und HP fehlten dort entgegen der Phase-4-Notiz tatsächlich noch.
+
+**Architekturentscheidungen (mit Begründung)**
+- *Duty-Cycle statt skaliertem Delta:* die Alternative wäre gewesen, jedem Aktor sein `delta` zu
+  skalieren — glatter, aber alle Frame-Zähler in den sieben geprüften Gegner-States hätten von
+  `int` auf float-Akkumulation umgebaut werden müssen. Der Duty-Cycle fasst **keine Zeile
+  Gegner-Code** an. Bei 320×180 mit gesnappten Transforms ist das Stottern praktisch unsichtbar;
+  falls doch: `time_scale` im `.tres` näher an 1.0 ziehen.
+- *Gegated wird `StateMachine` + `AnimatedSprite2D`, nicht der Body:* würde man den Body selbst
+  gaten, flackerten seine Collision-Shapes und die Hurtbox — der Spieler-Hitbox könnte ein Treffer
+  entgehen. So stehen Bewegung und Animation still, während der Gegner durchgehend trefferbar
+  bleibt. Hitstop und Zeitdehnung komponieren dabei **ohne Sonderfall**: der Hitstop trifft den
+  Body, und ein DISABLED-Elternteil schlägt jedes INHERIT im Kind.
+- *Kanalisieren ist zustandsunabhängig:* der Kanal überlebt Angriff und Hitstun. Sonst wäre der
+  Schadensbonus unerreichbar — der Schlag dauert länger als das Fenster, in dem man den Kanal
+  überhaupt starten könnte.
+- *Der Dash ist keine Grundfähigkeit:* „kein Dodge-Roll" aus dem Kickoff bleibt gültig; erst der
+  gehaltene Reif schaltet ihn frei. Damit hat Korruptionsstufe 2 überhaupt ein Ziel.
+- *I-Frames werden vom Dash nicht verbraucht:* die Unverwundbarkeit läuft über
+  `hurtbox.monitorable = false`, nicht über `take_hit`. Die regulären I-Frames gehören dem
+  Trefferfeedback und dürfen vom Dash nicht aufgezehrt werden.
+- *Verzögerte Maskenwiederherstellung:* endet der Dash in einem Gegner, bliebe der Spieler bei
+  sofortigem Zurücksetzen stecken. `Reif._restore_body_mask()` prüft jeden Frame mit
+  `test_move(..., recovery_as_collision = true)` — und muss die Maske für den Test kurz selbst
+  setzen, weil `test_move` gegen die *aktuelle* Maske prüft. Ohne das hätte die Prüfung stumm
+  immer „frei" gemeldet; headless abgesichert.
+- *Korruption im PartyManager statt im Player:* der Reif ist weiterreichbar, die Korruption nicht.
+  Genau dasselbe Muster wie Health aus Phase 4.
+- *Eigene `ReifStats`-Resource statt Felder in `TuningStats`:* der Reif ist EIN Gegenstand und
+  gehört keiner Figur. Nur die eine figurabhängige Achse (`corruption_gain_scale`) liegt in
+  `TuningStats`.
+
+**Regel Null (gegen die lokal gedumpte Klassen-DB geprüft, nicht geraten)**
+- `CollisionObject2D.set_collision_mask_value(layer_number: int, value: bool)` /
+  `get_collision_mask_value(layer_number: int) -> bool`
+- `PhysicsBody2D.test_move(from, motion, collision = null, safe_margin = 0.08,
+  recovery_as_collision = false) -> bool`
+- `JOY_AXIS_TRIGGER_RIGHT = 5`; `InputEventJoypadMotion.axis` / `.axis_value`
+
+**Verifikation (headless, `tests/phase5_sim.*`, 51/51 grün)**
+- Duty-Cycle exakt vermessen: Sonde tickt **55 von 100** Frames bei Faktor 0.55.
+- **Gegner-Timing gedehnt, Spieler nicht:** der 30-Frame-Telegraph des Skeletts braucht real
+  **53 Frames** (Faktor 0.57); die Laufstrecke des Spielers ist mit und ohne Kanal **44.7 px** —
+  der direkte Beleg, dass kein `Engine.time_scale` im Spiel ist.
+- Schaden: ohne Kanal 1, mit Kanal 2 (`roundi(1 × 1.75)`).
+- Phase-Dash: Gegner steht 26 px im Weg, der Dash endet **65.8 px** weiter; ohne Kanal passiert
+  nichts. Unverwundbarkeit gegen die **echte Gegner-Hitbox** geprüft (Treffer kommt im Dash nicht
+  an, danach trifft derselbe Gegner wieder) — die regulären I-Frames bleiben dabei unverbraucht.
+- Maske: endet der Dash im Gegner, bleibt Bit 3 gekürzt (`mask=1`) und kommt erst zurück, wenn der
+  Spieler frei steht (`mask=5`).
+- Stufen: Stufe 1 an der Schwelle, Vignette sichtbar (0.25) und bei Vollausschlag 1.0; Stufe 4 am
+  Anschlag. Drift: bei `drift_chance = 1.0` 15 statt 10 Frames, unter Stufe 2 nie.
+- Abbau: −0.80 in 2 s (unter 1 %/s).
+- Persistenz: Kurier behält seine 40 über zwei Wechsel; der Zwerg lädt mit 6.30 statt 9.00 messbar
+  langsamer auf (`corruption_gain_scale` 0.7) und behält seinen eigenen Wert.
+- **Phase-4-Regression nach den soliden Körpern: 27/27 grün.**
+- Shader kompiliert und rendert (Fenster-Lauf mit Vulkan/Forward+, Vignette bei Korruption 90
+  aktiv mit Intensität 0.896) — headless wird er nicht kompiliert, darum extra geprüft.
+
+**Feel-Abnahme durch User — teilweise erledigt (2026-09-02, beim Phase-6-Durchgang)**
+- ✅ Kanal, Zeitdehnung, Phase-Dash und die **soliden Körper** wurden im Raum von Phase 6
+  mitgespielt und für gut befunden. Punkte 1, 2 und 5 der Liste unten sind damit erledigt:
+  der Kanal verführt, die soliden Körper bleiben, die Zeitdehnung stottert nicht sichtbar.
+- ⏳ **Noch nicht bestätigt:** Vignette (Stufe 1) und Dash-Drift (Stufe 2). Beide erfordern
+  längeres Halten des Reifs, um die Schwellen überhaupt zu erreichen — im Puzzle-Durchgang kommt
+  man dort nicht zwangsläufig hin. Bleibt offen:
+  1. Ist die Vignette lesbar, ohne den Kampf zu stören? (`inner_radius`/`outer_radius`/`tint` im
+     ShaderMaterial, `ONSET` in `corruption_overlay.gd`.)
+  2. Fühlt sich der Drift wie ein Bug an oder wie eine Strafe? (`drift_chance`, `drift_scale`)
+
+**Offen / bekannte Punkte**
+- **Korruptionsstufen 3 und 4 sind nicht verdrahtet** (der Phasenplan sieht für Phase 5 nur 1–2
+  vor). Die Schwellen stehen im `reif.tres`, `Reif.level()` liefert bereits 3 und 4.
+- **Flüstern im Sound-Mix fehlt** — das Projekt hat keine Audio-Infrastruktur. Kandidaten und die
+  nötigen Schritte stehen in `docs/assets-todo.md`.
+- **Nur die aktive Figur baut Korruption ab.** Inaktive Figuren frieren auf ihrem Wert ein. Für den
+  Vertical Slice unkritisch (der Abbau ist ohnehin auf 250 s ausgelegt), aber eine bewusste Lücke.
+- Der Kanal hat **kein Sprite-Feedback am Spieler** (nur die Vignette ab Stufe 1). Erst nach der
+  Feel-Abnahme entscheiden, ob es eins braucht.
+- **Testharness-Merker:** die Dash-Taste muss im Sim **zwei** Physik-Frames gehalten werden — bei
+  nur einem trifft `Input.action_press` das `is_action_just_pressed`-Fenster nicht zuverlässig.
+
+## Tastenbelegung umgestellt ✅ (2026-09-02)
+
+**Anlass (User):** Mit WASD gesteuert war die alte Belegung unbrauchbar — `attack` lag auf J,
+`reif_channel` auf L, beide für die linke Hand unerreichbar. Und der Kanal wird *gehalten*, nicht
+getippt.
+
+**Neues Layout** — steuern mit WASD, austeilen mit der Maus:
+
+| Action | Belegung |
+|---|---|
+| `move_up/down/left/right` | WASD + Pfeiltasten |
+| `attack` | **Linksklick** · E · J |
+| `dash` | **Leertaste** · Shift · Gamepad A |
+| `reif_channel` (halten) | **Rechtsklick** · L · rechter Trigger |
+| `switch_figure` | Q · beide Schultertasten |
+| `debug_toggle` | F1 |
+
+- **Space musste aus `attack` raus** — es lag dort seit Phase 1 und kollidierte mit dem neuen Dash.
+- E liegt direkt neben W; J und L bleiben als Zweitbelegung fürs Pfeiltasten-Spiel erhalten.
+- **Regel für künftige Bindings:** alles, was im Kampf gedrückt oder *gehalten* wird, muss die
+  linke Hand auf WASD oder die rechte auf der Maus erreichen.
+
+**`tools/add_input_actions.gd` ist jetzt die alleinige Quelle der Belegung.** Vorher hat es nur
+*fehlende* Actions ergänzt (`_ensure`) und hätte eine Änderung an einer bestehenden Action still
+ignoriert. Jetzt deklariert es die **komplette** Map und überschreibt sie (`_write`) — wer eine
+Taste ändern will, ändert sie dort und lässt das Tool laufen. Ein zweiter Lauf erzeugt exakt
+dasselbe Ergebnis.
+*Stolperfalle dabei:* die Hilfsfunktion durfte nicht `_set` heißen — das kollidiert mit
+`Object._set(StringName, Variant) -> bool` und scheitert schon beim Parsen.
+
+**Verifikation**
+- Signaturen gegen die lokale Klassen-DB geprüft: `InputEventMouseButton.button_index`
+  (enum `MouseButton`), `MOUSE_BUTTON_LEFT = 1` / `RIGHT = 2`.
+- Jedes Binding mit echten `InputEvent`-Objekten durchgespielt (`Input.parse_input_event`):
+  Space→dash, Shift→dash (Modifier-Matching funktioniert), E/J/Linksklick→attack,
+  Rechtsklick→reif_channel, Q→switch_figure — und die **Gegenprobe, dass Space nicht mehr
+  angreift**.
+- Beide Sims danach erneut grün (phase4 27/27, phase5 51/51). Sie treiben Actions über
+  `Input.action_press()` und sind von der Belegung unabhängig — genau deshalb bleiben sie gültig.
+- Kein Konflikt mit der UI: Spieler und Reif lesen den `Input`-Singleton in `_physics_process`,
+  nicht `_unhandled_input` — ein Control könnte den Klick also gar nicht wegfangen.
+
+## Phase 6 — Ein echter Raum ✅ (2026-09-02)
+
+**Anlass:** Bis hierher wurde in `scenes/main.tscn` gespielt — einer Phase-0-Bootstrap-Szene, die
+per Skript ein Platzhalter-Tile über den Viewport kachelte. Keine Wände, keine Kamera, kein Grund,
+sich irgendwohin zu bewegen. Damit waren zwei fertige Mechaniken **folgenlos**: der Figurenwechsel
+war nur eine Kampf-Achse, und der Phase-Dash lief zwar durch Gegner — die man in einer offenen
+Arena aber genauso gut umlaufen konnte.
+
+**Der Raum**
+- `scenes/rooms/room_01.tscn`: **40×24 Tiles = 640×384 px**, exakt der doppelte Viewport.
+  Links die Kammer mit Startpunkt und Druckplatte, rechts hinter der Zeittür ein **2 Tiles hoher
+  Korridor** mit einem Skelett darin, dahinter eine Zielkammer.
+- Zwei `TileMapLayer` (**kein `TileMap`** — in 4.6 entfernt): `Floor` ohne Kollision, `Walls` mit.
+  Boden liegt **überall**, auch unter den Wänden — so klafft beim Öffnen der Tür kein Loch.
+- `Camera2D` als **Kind des Players**, Limits aus `Room.bounds()`, Smoothing aus.
+
+**Das Puzzle: der Figurenwechsel wird zum Verb**
+- Neues Feld **`TuningStats.weight`** (Kurier 1.0, Zwerg 3.0). Die `PressurePlate` gibt ab 2.0
+  nach — der Kurier läuft wirkungslos darüber.
+- Die Tür öffnet für `open_frames` (240 F = 4 s). **Distanz Platte→Tür = 304 px.** Der Zwerg
+  schafft in dem Fenster nur 232 px, der Kurier 380 px. Also: als Zwerg auslösen, wechseln,
+  als Kurier rennen. Puffer nach beiden Seiten ~75 px, damit das kein Zufallsergebnis ist.
+- Im Korridor lässt sich das Skelett per Phase-Dash überlaufen statt bekämpfen — bezahlt mit
+  Korruption. Damit hat der Reif zum ersten Mal eine Raum-Bedeutung.
+
+**Architekturentscheidungen (mit Begründung)**
+- *Raumgeometrie wird generiert, nicht editiert* (`tools/build_room_resources.gd`):
+  `TileMapLayer.tile_map_data` ist eine binäre `PackedByteArray` — von Hand schlicht nicht
+  schreibbar. Erzeugen heißt `PackedScene.pack()`, und das verbietet CLAUDE.md für Szenen mit
+  instanzierten Subszenen (es klopft sie flach). Darum die Trennung: `room_01_tiles.tscn` enthält
+  **nur** TileMapLayer und ist generiert; alles Instanzierte (Tür, Platte, Skelett) lebt eine
+  Ebene höher in der handgeschriebenen `room_01.tscn`.
+- *Tile-Auswahl empirisch, nicht nach Augenmaß:* ein Probe-Lauf hat jedes Tile aller Interior-/
+  Dungeon-Sheets darauf geprüft, ob es **voll deckend und selbst-nahtlos kachelbar** ist (linke
+  Spalte == rechte, obere Zeile == untere). Ergebnis: Boden = `TilesetInteriorFloor` (14,15)
+  dunkles Kopfsteinpflaster, Wand = (1,7) orangeroter Ziegel. **`TilesetWallSimple.png` ist dabei
+  ausgeschieden** — es sieht wie ein Wandset aus, ist aber ein 9-Slice-Rahmen mit transparenter
+  Mitte und taugt nicht als Fläche. Hätte man nach Namen ausgewählt, wäre genau das schiefgegangen.
+- *Die Platte scannt den Spieler* (Layer 8 `interactable`, Mask 2 `player_body`), nicht umgekehrt.
+  Das spart eine Interact-Action und jede Zeile Player-Code — es gibt keinen Knopf, das Gewicht
+  **ist** der Input. Die Matrix-Zeile in CLAUDE.md ist entsprechend präzisiert.
+- *Ausgewertet wird jeden Physik-Frame, nicht per `body_entered`:* der Figurenwechsel tauscht nur
+  das Profil am bestehenden Player-Node (Phase 4). Wer auf der Platte **stehend** wechselt, löst
+  kein neues `body_entered` aus — mit signalgetriebener Auswertung wäre die zentrale Interaktion
+  des Raums tot gewesen.
+- *Die Tür schließt nie auf jemandem:* läuft der Zähler ab, während noch ein Körper im Türfeld
+  steht, wartet sie. Dieselbe Klasse Problem und dieselbe Lösung wie
+  `Reif._restore_body_mask()` — den Zustand erst zurücknehmen, wenn das Feld nachweislich frei ist.
+- *`weight` ist float, kein bool:* Zwischenstufen sind tunebar und künftige Figuren ordnen sich
+  ein, ohne dass eine Zeile Platten-Code angefasst wird (gleiche Begründung wie
+  `knockback_taken_scale` in Phase 4).
+- *Kein Y-Sort:* die Wandkacheln sind flache Blöcke ohne Oberkante — es gibt nichts zu sortieren.
+  Bewusst nicht „auf Vorrat" eingeschaltet; wird erst nötig, wenn Wände Höhe bekommen.
+
+**Bug gefunden & behoben (durch die neuen Wände aufgedeckt)**
+- `Reif._restore_body_mask()` prüfte mit `test_move` gegen die **volle** Maske. Bis Phase 5 war das
+  dasselbe wie „gegen Gegner prüfen", weil es außer dem Boden nichts Solides gab. Mit Wänden nicht
+  mehr: ein Dash, der direkt an einer Wand endet, hätte den Test dauerhaft auf „blockiert" gehalten
+  — der Spieler wäre **ohne jeden Hinweis phasend stehen geblieben** und hätte weiter durch Gegner
+  laufen können. Jetzt wird gegen genau Bit 3 (`enemy_body`) geprüft. Der Phase-5-Sim hat den
+  Fehler beim ersten Lauf mit Raum sofort gemeldet.
+
+**Nebenbefund (behoben)**
+- Das Debug-Overlay lief mit der **Default-Schriftgröße 16** im 320×180-Canvas und wurde mit ihm
+  ×4…×6 hochskaliert — es verdeckte den halben Bildschirm. Bis Phase 5 nur unschön, mit einem Raum
+  aber ein Blocker für die Sichtprüfung. Jetzt 8 px per Theme-Override in der `.tscn`. Ergänzt um
+  Gewicht der Figur sowie Platten- und Türzustand.
+
+**Verifikation (headless, `tests/phase6_sim.*`, 26/26 grün)**
+- Raummaß 640×384, Spieler startet am Marker, Tür zu, Platte offen.
+- **Kamera:** hängt am Player, Limits == Raumgrenzen (0,0..640,384), beide Smoothings aus.
+- **Wände solide:** 120 Frames gegen die Außenwand ergeben 35 px statt 190 px freier Lauf; der
+  Spieler bleibt bei x=21 im Raum (Wand 0..16 + halbe Körperbreite).
+- **Platte:** Kurier (1.0) drückt sie 60 Frames lang nicht. Wechsel auf den Zwerg **im Stehen**
+  → Platte gibt nach, Tür offen, Türkollision aus. Genau der Fall, den `body_entered` verpasst hätte.
+- **Zeittür:** schließt nach `open_frames` wieder; steht der Spieler im Türfeld, bleibt sie offen
+  und schließt erst, wenn er weg ist.
+- **Puzzle-Zahl gemessen:** 304 px Distanz, 4,00 s Fenster → Zwerg 232 px (**schafft es nicht**),
+  Kurier 380 px (**schafft es**), Puffer 72 / 76 px.
+- **Phase-Dash im Korridor:** trägt 66,7 px durch das Skelett hindurch, die Maske kommt trotz des
+  engen Korridors zurück (`mask=5`) — und gegen eine Wand endet der Dash nach 24 statt 53 px
+  **an** der Wand (Bit 1 bleibt in der Maske).
+- **Regression:** phase4 27/27 und phase5 51/51 weiterhin grün.
+- **Fensterlauf** (Vulkan/Forward+, 180 Frames) fehlerfrei — headless rendert keine Tiles und
+  kompiliert keine Shader, darum extra geprüft. Screenshot gegengesehen: Wand/Boden-Kontrast
+  liest sich, die offene Tür ist als Lücke in der Trennwand erkennbar, Platte sichtbar.
+
+**Feel-Abnahme durch User ✅ (2026-09-02)**
+- Raum im Editor durchgespielt: **„sieht alles gut aus, fühlt sich gut an"**. Keine
+  Tuning-Änderung gewünscht. Damit sind alle fünf offenen Fragen aus diesem Abschnitt erledigt:
+  Türfenster (`open_frames = 240`) ist fair, Platte ist lesbar, Korridor funktioniert, keine
+  Tile-Seams an den Kamerarändern, der repetitive Boden stört nicht.
+- **Diese Werte gelten damit als abgenommen** und sind ab jetzt Referenz: `open_frames = 240`,
+  `required_weight = 2.0`, `weight` 1.0/3.0, Distanz Platte→Tür 304 px, Raummaß 40×24.
+  Wer einen davon ändert, ändert eine abgenommene Größe.
+
+**Offen / bekannte Punkte**
+- **Nur ein Raum, kein Raumwechsel.** `room_01.tscn` wird von `main.tscn` fest instanziert; es gibt
+  keinen Übergang in einen zweiten Raum und kein Ziel in der Zielkammer.
+- **Ein einziges Wand- und ein einziges Bodentile** — keine Autotile-Terrains, keine Ecken/Kanten.
+  Bewusst: ein Autotiler ist Umfang, und der Vertical Slice priorisiert Kampfgefühl. Die
+  9-Slice-Rahmen aus `TilesetWallSimple.png` lägen dafür bereit.
+- **Kein echtes Game-Over** (unverändert seit Phase 3).
+
 ## Nächste Phase
-- **Phase 5 — Reif** (nach Go & Feel-Abnahme von Phase 4): Kanalisierung auf gehaltene Taste,
-  Zeitdehnung **nur über den HitstopManager** (nie `Engine.time_scale`), Phase-Dash (zur Laufzeit
-  `player_body`-Mask um Bit 3 kürzen + Hurtbox aussetzen, nur Masken toggeln), Korruptionszähler
-  und Stufen 1–2 als Feedback. Der Korruptions-Zustand gehört pro Figur in den `PartyManager`
-  (dort liegt schon die persistente Health) — der Reif ist weiterreichbar.
+- Offen. Kandidaten aus den bekannten Punkten: Raumwechsel/Ziel, Audio-Infrastruktur (Flüstern
+  für Korruptionsstufe 1), Korruptionsstufen 3 und 4 verdrahten, Game-Over.

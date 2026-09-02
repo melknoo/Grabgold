@@ -3,10 +3,12 @@
 [ext_resource type="Script" path="res://ui/debug_overlay/debug_overlay.gd" id="1_overlay"]
 
 [node name="DebugOverlay" type="CanvasLayer"]
+layer = 3
 script = ExtResource("1_overlay")
 
 [node name="Label" type="Label" parent="."]
-offset_left = 6.0
-offset_top = 40.0
-offset_right = 200.0
-offset_bottom = 120.0
+offset_left = 3.0
+offset_top = 2.0
+offset_right = 240.0
+offset_bottom = 178.0
+theme_override_font_sizes/font_size = 8

@@ -20,6 +20,10 @@ var _index: int = 0
 ## Health pro Figur, Index-parallel zu `figures`. -1 = noch nie aktiv gewesen -> beim ersten
 ## Aktivieren aus `stats.max_health` gefuellt.
 var _health: Array[int] = []
+## Korruption pro Figur, Index-parallel zu `figures`. Startet bei 0.0. DAS ist die Umsetzung von
+## "der Reif ist jederzeit weiterreichbar": wechseln heisst den Ring uebergeben — die Korruption
+## bleibt bei der Figur, die sie sich geholt hat, und baut extrem langsam ab.
+var _corruption: Array[float] = []
 
 func _ready() -> void:
 	if figures.is_empty() or player == null:
@@ -27,6 +31,8 @@ func _ready() -> void:
 		return
 	_health.resize(figures.size())
 	_health.fill(-1)
+	_corruption.resize(figures.size())
+	_corruption.fill(0.0)
 	# Der Player hat sein Startprofil selbst schon angewandt; hier nur den Index synchronisieren.
 	var start: int = figures.find(player.profile)
 	_index = start if start >= 0 else 0
@@ -42,6 +48,7 @@ func switch_next() -> void:
 	if not player.can_switch():
 		return
 	_health[_index] = player.get_health()
+	_corruption[_index] = player.get_corruption()
 	_activate((_index + 1) % figures.size(), true)
 
 ## `reset_state` false = Initialisierung (Player steht schon), true = echter Wechsel.
@@ -52,6 +59,7 @@ func _activate(index: int, reset_state: bool) -> void:
 	if _health[_index] < 0:
 		_health[_index] = profile.stats.max_health
 	player.set_health(_health[_index])
+	player.set_corruption(_corruption[_index])
 	if reset_state:
 		# Die neue Figur uebernimmt Position und Facing, startet aber aus dem Stand: sonst erbt
 		# der Zwerg die Vollgeschwindigkeit des Kuriers und der Tempo-Unterschied waere unsichtbar.
@@ -64,3 +72,10 @@ func active_index() -> int:
 
 func active_profile() -> FigureProfile:
 	return figures[_index] if _index < figures.size() else null
+
+## Korruption einer inaktiven Figur (fuers Debug-Overlay und die Tests). Die aktive Figur haelt
+## ihren Wert im Player, nicht hier.
+func corruption_of(index: int) -> float:
+	if index == _index and player != null:
+		return player.get_corruption()
+	return _corruption[index] if index < _corruption.size() else 0.0

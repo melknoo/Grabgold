@@ -6,6 +6,9 @@ func enter(_msg: Dictionary = {}) -> void:
 
 func physics_update(delta: float) -> void:
 	var player := actor as Player
+	if Input.is_action_just_pressed(&"dash") and player.reif.can_dash():
+		state_machine.transition_to(&"dash")
+		return
 	if player.consume_attack():
 		state_machine.transition_to(&"attack")
 		return

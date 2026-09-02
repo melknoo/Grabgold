@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://actors/props/pressure_plate.gd" id="1_plate"]
+[ext_resource type="Texture2D" path="res://assets/external/Ninja Adventure - Asset Pack/Backgrounds/Tilesets/TilesetDungeon.png" id="2_dungeon"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plate"]
+size = Vector2(14, 14)
+
+[node name="PressurePlate" type="Area2D"]
+collision_layer = 128
+collision_mask = 2
+monitorable = false
+script = ExtResource("1_plate")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_dungeon")
+region_enabled = true
+region_rect = Rect2(80, 48, 16, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_plate")

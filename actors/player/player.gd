@@ -3,6 +3,9 @@ extends CharacterBody2D
 
 ## Signalisiert Health-Aenderungen nach aussen (PartyManager haelt sie pro Figur persistent).
 signal health_changed(current: int, maximum: int)
+## Dito fuer die Korruption (Phase 5). Der Reif ist weiterreichbar, die Korruption bleibt bei der
+## Figur — der persistente Wert liegt darum im PartyManager, nicht hier.
+signal corruption_changed(value: float, level: int)
 
 @export var profile: FigureProfile
 
@@ -11,6 +14,11 @@ signal health_changed(current: int, maximum: int)
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var hitbox: Hitbox = $Hitbox
 @onready var hurtbox: Hurtbox = $Hurtbox
+@onready var reif: Reif = $Reif
+## Kind des Players, nicht des Raums: der Figurenwechsel tauscht nur das Profil am bestehenden
+## Node (Phase 4) — die Kamera ueberlebt den Wechsel damit von selbst. Ihre Limits setzt der
+## Bootstrap aus den Raumgrenzen (scenes/main.gd).
+@onready var camera: Camera2D = $Camera2D
 
 ## Name der AnimationLibrary am AnimationPlayer. Leerer StringName = Default-Library, damit die
 ## Animation weiterhin als "attack" (ohne Praefix) abgespielt wird.
@@ -20,6 +28,7 @@ var stats: TuningStats
 var facing: StringName = &"down"
 var _attack_buffer_frames_left: int = 0
 var _health: int
+var _corruption: float = 0.0
 
 func _ready() -> void:
 	add_to_group(&"player")
@@ -51,6 +60,15 @@ func set_health(value: int) -> void:
 
 func get_health() -> int:
 	return _health
+
+## Korruption 0..reif.stats.corruption_max. Wird vom Reif getickt und vom PartyManager ueber den
+## Figurenwechsel hinweg gesichert — apply_profile setzt sie deshalb bewusst NICHT zurueck.
+func set_corruption(value: float) -> void:
+	_corruption = maxf(0.0, value)
+	corruption_changed.emit(_corruption, reif.level() if reif != null else 0)
+
+func get_corruption() -> float:
+	return _corruption
 
 ## Ein Figurenwechsel darf einen laufenden Schlag oder Hitstun nicht abbrechen — sonst wird die
 ## Schultertaste zum Cancel-Tool und der Nachteil "langsamer Zwerg" waere folgenlos.
@@ -88,7 +106,9 @@ func consume_attack() -> bool:
 	return false
 
 func enable_hitbox() -> void:
-	hitbox.damage = stats.attack_damage
+	# Hoeherer Schaden, solange der Reif kanalisiert wird (Kickoff). Der Kanal muss den Schlag
+	# ueberleben — darum ist Kanalisieren zustandsunabhaengig (siehe reif.gd).
+	hitbox.damage = roundi(stats.attack_damage * reif.damage_multiplier())
 	hitbox.knockback_speed = stats.knockback_speed
 	hitbox.hitstop_frames = stats.hitstop_frames
 	hitbox.knockback_dir = facing_vector()

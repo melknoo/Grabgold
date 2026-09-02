@@ -1,41 +1,27 @@
 extends Node2D
-## Phase-0-Bootstrap: verifiziert Nearest-Filtering + Integer-Scaling.
-## Kachelt das Platzhalter-Tile ueber den kompletten 320x180-Viewport und zeigt
-## einen 8x-vergroesserten Ausschnitt, an dem Filter-/Skalierungs-Artefakte sofort
-## sichtbar waeren. Kein Produktionscode — nur Sichtpruefung fuer Phase 0.
+## Bootstrap des Vertical Slice (ab Phase 6).
+##
+## Bis Phase 5 hat diese Datei das Platzhalter-Tile ueber den Viewport gekachelt und einen
+## 8x-Zoom-Ausschnitt gezeigt — eine reine Sichtpruefung fuer Nearest-Filtering und
+## Integer-Scaling aus Phase 0. Die ist vom User abgenommen, der Code ist damit erledigt und
+## ersatzlos raus. Jetzt setzt der Bootstrap den Spieler in den Raum und richtet die Kamera aus.
 
-const TILE: Texture2D = preload("res://assets/placeholder/tile_16.png")
-const TILE_SIZE: int = 16
+@onready var room: Room = $Room01
+@onready var player: Player = $Player
 
 func _ready() -> void:
-	var view: Vector2i = get_viewport_rect().size
-	# Grundflaeche mit dem Tile kacheln.
-	var cols: int = int(ceil(view.x / float(TILE_SIZE)))
-	var rows: int = int(ceil(view.y / float(TILE_SIZE)))
-	for y in rows:
-		for x in cols:
-			var s := Sprite2D.new()
-			s.texture = TILE
-			s.centered = false
-			s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			s.position = Vector2(x * TILE_SIZE, y * TILE_SIZE)
-			s.z_index = -100
-			add_child(s)
+	player.global_position = room.spawn_point()
+	_apply_camera_limits()
 
-	# Ein 8x hochskaliertes Tile: hier wuerde Sub-Pixel-Blur brutal auffallen.
-	var zoom := Sprite2D.new()
-	zoom.texture = TILE
-	zoom.centered = false
-	zoom.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	zoom.scale = Vector2(8, 8)
-	zoom.position = Vector2(96, 26)
-	zoom.z_index = -100
-	add_child(zoom)
-
-	# Kontext-Label fuer die Sichtpruefung/Screenshot.
-	var layer := CanvasLayer.new()
-	add_child(layer)
-	var label := Label.new()
-	label.text = "GRABGOLD — Phase 0\n320x180 · Integer x6 · Nearest"
-	label.position = Vector2(6, 6)
-	layer.add_child(label)
+## Die Kamera darf nie ueber die Aussenwand hinausschauen. Smoothing bleibt aus (CLAUDE.md >
+## Auflösung & Look): es erzeugt Sub-Pixel-Kamerapositionen und damit Tile-Seams — genau die
+## Naht, die mit echten Kacheln ab Phase 6 zum ersten Mal sichtbar werden koennte.
+func _apply_camera_limits() -> void:
+	var b: Rect2i = room.bounds()
+	var cam: Camera2D = player.camera
+	cam.limit_left = b.position.x
+	cam.limit_top = b.position.y
+	cam.limit_right = b.end.x
+	cam.limit_bottom = b.end.y
+	cam.limit_smoothed = false
+	cam.position_smoothing_enabled = false

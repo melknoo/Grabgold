@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://actors/player/player.gd" id="1_player"]
 [ext_resource type="Resource" path="res://resources/figure_kurier.tres" id="2_profile"]
@@ -10,6 +10,9 @@
 [ext_resource type="Script" path="res://actors/player/states/hurt.gd" id="8_hurt"]
 [ext_resource type="Script" path="res://components/hitbox.gd" id="10_hitbox"]
 [ext_resource type="Script" path="res://components/hurtbox.gd" id="11_hurtbox"]
+[ext_resource type="Script" path="res://actors/player/states/dash.gd" id="12_dash"]
+[ext_resource type="Script" path="res://actors/player/reif.gd" id="13_reif"]
+[ext_resource type="Resource" path="res://resources/reif.tres" id="14_reifstats"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(10, 8)
@@ -22,7 +25,7 @@ size = Vector2(12, 14)
 
 [node name="Player" type="CharacterBody2D"]
 collision_layer = 2
-collision_mask = 1
+collision_mask = 5
 script = ExtResource("1_player")
 profile = ExtResource("2_profile")
 
@@ -34,6 +37,11 @@ autoplay = "idle_down"
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, 4)
 shape = SubResource("RectangleShape2D_body")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position_smoothing_enabled = false
+rotation_smoothing_enabled = false
+limit_smoothed = false
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 
@@ -56,6 +64,10 @@ script = ExtResource("11_hurtbox")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
 shape = SubResource("RectangleShape2D_hurtbox")
 
+[node name="Reif" type="Node" parent="."]
+script = ExtResource("13_reif")
+stats = ExtResource("14_reifstats")
+
 [node name="StateMachine" type="Node" parent="." node_paths=PackedStringArray("initial_state")]
 script = ExtResource("4_statemachine")
 initial_state = NodePath("Idle")
@@ -71,3 +83,6 @@ script = ExtResource("7_attack")
 
 [node name="Hurt" type="Node" parent="StateMachine"]
 script = ExtResource("8_hurt")
+
+[node name="Dash" type="Node" parent="StateMachine"]
+script = ExtResource("12_dash")
