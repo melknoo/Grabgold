@@ -77,8 +77,7 @@ func playtime_frames() -> int:
 
 
 func playtime_text() -> String:
-	var seconds: int = _playtime_frames / 60
-	return "%02d:%02d" % [seconds / 60, seconds % 60]
+	return SaveData.format_frames(_playtime_frames)
 
 
 # --- Slots ------------------------------------------------------------------------------------

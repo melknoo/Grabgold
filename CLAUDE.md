@@ -34,6 +34,17 @@ Projekt. Bei Signatur-Zweifeln gilt trotzdem Regel Null gegen die **lokal** gedu
 
 - **Regel Null:** Methodensignaturen (`move_and_slide`, `AnimationPlayer` Call-Method-Tracks,
   Area2D-Masken) gegen die echte Klassen-DB/lokale Doku prüfen — nie aus dem Gedächtnis raten.
+- **Freigegebene Nodes und Typisierung** (im Spielen aufgefallen, Phase 9): wo eine gemerkte
+  Node-Referenz freigegeben sein *kann* — Merklisten im `HitstopManager` und im `Reif`, Argumente
+  seiner Abfragen — muss die Variable bzw. der Parameter **`Variant`** sein, nicht `Node`. Die
+  Zuweisung an einen typisierten Platz ist selbst schon der Fehler („Trying to assign invalid
+  previously freed instance" / „…not a subclass of the expected argument class") und schlägt zu,
+  **bevor** `is_instance_valid` überhaupt gefragt werden kann. Also: untypisiert aufnehmen,
+  prüfen, dann verwenden.
+- **`monitorable` nie direkt in einem Area-Signal setzen** — Godot blockt es dort
+  („Function blocked during in/out signal"), der Wert bleibt einfach stehen. Immer
+  `set_deferred("monitorable", …)`; dieselbe Klasse Problem wie beim `process_mode` im
+  HitstopManager (Phase 2) und bei der Tür (Phase 6).
 - **4.6-Besonderheit:** `TileMap` gibt es nicht mehr → **`TileMapLayer`** verwenden. Dessen
   `tile_map_data` ist eine binäre `PackedByteArray` — eine Tilemap ist damit **nicht von Hand**
   in eine `.tscn` schreibbar und muss generiert werden (`tools/build_room_resources.gd`).
@@ -381,7 +392,7 @@ des Raums. Der Raum selbst ist das einzige Kind von **`RoomHost`** und wird geta
 ## Tests
 
 - `$GODOT --headless --path . res://tests/phase4_sim.tscn` — Figurenwechsel (27 Checks).
-- `$GODOT --headless --path . res://tests/phase5_sim.tscn` — Reif (51 Checks).
+- `$GODOT --headless --path . res://tests/phase5_sim.tscn` — Reif (57 Checks).
 - `$GODOT --headless --path . res://tests/phase6_sim.tscn` — Raum, Platte, Tür, Kamera (26 Checks).
 - `$GODOT --headless --path . res://tests/phase7_sim.tscn` — Korruptionsstufen 3/4, Ausfall,
   Game Over.

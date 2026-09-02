@@ -45,7 +45,7 @@ func _despawn() -> void:
 	hide()
 	state_machine.process_mode = Node.PROCESS_MODE_DISABLED
 	hitbox.disable()
-	hurtbox.monitorable = false
+	hurtbox.set_deferred("monitorable", false)  # gleicher Grund wie in states/dead.gd
 	set_deferred("collision_layer", 0)
 	$CollisionShape2D.set_deferred("disabled", true)
 	queue_free()

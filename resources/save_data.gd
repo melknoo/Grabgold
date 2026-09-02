@@ -95,10 +95,20 @@ static func from_dict(data: Variant) -> SaveData:
 	return out
 
 
-## "03:28" — Minuten:Sekunden aus Frames bei 60 Hz.
+## "03:28" — Minuten:Sekunden aus Frames bei 60 Hz. Static, weil der SaveManager die LAUFENDE
+## Spielzeit genauso anzeigt: es soll dafuer nur eine Formatierung geben.
+##
+## Die `warning_ignore` sind Absicht, nicht Bequemlichkeit: hier IST Ganzzahldivision gewollt
+## (Frames -> Sekunden -> Minuten), und ohne die Marke warnt der Parser bei jedem Laden.
+static func format_frames(frames: int) -> String:
+	@warning_ignore("integer_division")
+	var seconds: int = frames / 60
+	@warning_ignore("integer_division")
+	var text: String = "%02d:%02d" % [seconds / 60, seconds % 60]
+	return text
+
 func playtime_text() -> String:
-	var seconds: int = playtime_frames / 60
-	return "%02d:%02d" % [seconds / 60, seconds % 60]
+	return format_frames(playtime_frames)
 
 
 ## Einzeiler fuer die Slot-Anzeige im Game-Over-Menue.

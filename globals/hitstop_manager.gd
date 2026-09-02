@@ -26,7 +26,9 @@ func _ready() -> void:
 func hitstop(frames: int, nodes: Array) -> void:
 	if frames <= 0:
 		return
-	for n: Node in nodes:
+	# `Variant`, gleicher Grund wie in _tick_frozen: die Liste kommt vom Aufrufer und kann einen
+	# Node enthalten, der im selben Frame freigegeben wurde.
+	for n: Variant in nodes:
 		if not is_instance_valid(n):
 			continue
 		_frozen[n] = frames
@@ -51,20 +53,32 @@ func clear_time_scale(node: Node) -> void:
 	if is_instance_valid(node):
 		node.set_deferred("process_mode", Node.PROCESS_MODE_INHERIT)
 
-func time_scale_for(node: Node) -> float:
+## Parameter BEWUSST `Variant`, nicht `Node`: gefragt wird typischerweise nach einem Node, den
+## der Aufrufer sich gemerkt hat — und der kann inzwischen freigegeben sein. Mit `Node` in der
+## Signatur waere schon der Aufruf der Fehler ("The Object-derived class of argument 1
+## (previously freed) is not a subclass of the expected argument class"), statt eine ehrliche
+## Antwort zu bekommen: ein freigegebener Node ist nicht verlangsamt.
+func time_scale_for(node: Variant) -> float:
+	if not is_instance_valid(node):
+		return 1.0
 	return _factor.get(node, 1.0)
 
-func is_slowed(node: Node) -> bool:
-	return _slowed.has(node)
+func is_slowed(node: Variant) -> bool:
+	return is_instance_valid(node) and _slowed.has(node)
 
 func _physics_process(_delta: float) -> void:
 	_tick_frozen()
 	_tick_slowed()
 
+## Laufvariable BEWUSST `Variant`, nicht `Node`: die Schluessel sind Nodes, die inzwischen
+## freigegeben sein koennen (ein Gegner stirbt mitten im Hitstop oder in der Zeitdehnung). Die
+## Zuweisung an eine typisierte Variable ist selbst schon der Fehler ("Trying to assign invalid
+## previously freed instance") — sie schlaegt zu, BEVOR `is_instance_valid` ueberhaupt gefragt
+## wird. Untypisiert aufnehmen, pruefen, dann verwenden.
 func _tick_frozen() -> void:
 	if _frozen.is_empty():
 		return
-	for n: Node in _frozen.keys():
+	for n: Variant in _frozen.keys():
 		if not is_instance_valid(n):
 			_frozen.erase(n)
 			continue
@@ -76,7 +90,8 @@ func _tick_frozen() -> void:
 func _tick_slowed() -> void:
 	if _slowed.is_empty():
 		return
-	for n: Node in _slowed.keys():
+	# Laufvariable `Variant` — Begruendung siehe _tick_frozen.
+	for n: Variant in _slowed.keys():
 		if not is_instance_valid(n):
 			_slowed.erase(n)
 			_factor.erase(n)

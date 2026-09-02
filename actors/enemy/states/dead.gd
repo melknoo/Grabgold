@@ -11,7 +11,11 @@ func enter(_msg: Dictionary = {}) -> void:
 	# Todespose war nie zu sehen — aufgedeckt vom Gegner-Respawn-Check in phase8_sim.
 	enemy.sprite.play(&"dead")
 	enemy.hitbox.disable()
-	enemy.hurtbox.monitorable = false
+	# set_deferred: dieser State wird aus `hurtbox.hit_taken` betreten, also mitten im
+	# Area-in/out-Signal. Godot verweigert dort das direkte Setzen von `monitorable`
+	# ("Function blocked during in/out signal") — es blieb bis dahin einfach stehen, der tote
+	# Gegner war für 45 Frames weiter treffbar.
+	enemy.hurtbox.set_deferred("monitorable", false)
 	enemy.set_deferred("collision_layer", 0)
 	enemy.get_node("CollisionShape2D").set_deferred("disabled", true)
 	# Erledigt-Flag (Phase 9). Nur fuer Gegner MIT `persist_id` — normale Gegner respawnen

@@ -258,6 +258,42 @@ func _ready() -> void:
 	check("Zwerg hat seinen eigenen Wert behalten",
 		absf(player.get_corruption() - zwerg_gain) < 1.0, "%.2f" % player.get_corruption())
 
+	print("\n== 12. Gegner stirbt WAEHREND der Zeitdehnung ==")
+	# Der Fall, der im Spielen aufgefallen ist: Reif kanalisiert, der Gegner wird erledigt und
+	# gibt sich frei — Reif und HitstopManager halten aber noch Referenzen auf seine StateMachine
+	# und seinen Sprite. Beide iterierten diese Merkliste mit einer als `Node` TYPISIERTEN
+	# Laufvariable, und genau diese Zuweisung ist der Fehler ("Trying to assign invalid
+	# previously freed instance") — sie schlaegt zu, bevor `is_instance_valid` gefragt wird.
+	party.switch_next()  # zurueck auf den Kurier
+	await physics(2)
+	skeleton.position = player.position + Vector2(30, 0)
+	Input.action_press(&"reif_channel")
+	await physics(10)
+	check("Vorbedingung: der Gegner ist gedehnt",
+		HitstopManager.is_slowed(skeleton.state_machine)
+		and HitstopManager.is_slowed(skeleton.sprite))
+	var machine: Node = skeleton.state_machine
+	var sprite: Node = skeleton.sprite
+	skeleton.hurtbox.take_hit(skeleton.get_health(), Vector2.ZERO)
+	# Ueber das Ende der Todesanimation hinaus weiterlaufen: erst danach ist der Gegner
+	# freigegeben und die Merklisten zeigen ins Leere. Die 45 Frames des Dead-States brauchen
+	# hier deutlich laenger als 45 Frames — der Gegner bleibt bis zuletzt gedehnt (er steht bis
+	# zur Freigabe in der Gruppe `enemy`), tickt also nur mit `time_scale`.
+	await physics(120)
+	check("Gegner ist freigegeben", not is_instance_valid(skeleton))
+	check("HitstopManager haelt keine toten Nodes mehr",
+		not HitstopManager.is_slowed(machine) and not HitstopManager.is_slowed(sprite))
+	# Der eigentliche Nachweis: der Reif laeuft ungestoert weiter, statt jeden Frame in einen
+	# Fehler zu laufen.
+	var corruption_before: float = player.get_corruption()
+	await physics(30)
+	check("Reif kanalisiert weiter", reif.is_channeling())
+	check("Korruption laedt weiter auf", player.get_corruption() > corruption_before,
+		"%.2f -> %.2f" % [corruption_before, player.get_corruption()])
+	Input.action_release(&"reif_channel")
+	await physics(2)
+	check("Kanal endet regulaer", not reif.is_channeling())
+
 	print("\n%s (%d Fehler)" % ["ALLES GRUEN" if _fails == 0 else "FEHLER", _fails])
 	get_tree().quit(1 if _fails > 0 else 0)
 

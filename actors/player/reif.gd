@@ -188,14 +188,19 @@ func _apply_time_dilation() -> void:
 				current.append(tick_node)
 	# Wer letzten Frame verlangsamt war und jetzt nicht mehr dazugehoert (Gegner tot oder aus der
 	# Gruppe), bekommt seine Zeit zurueck — sonst bliebe er gegated.
-	for n: Node in _slowed:
-		if not current.has(n):
+	# Laufvariable `Variant`, nicht `Node`: in `_slowed` koennen Nodes stehen, die mit ihrem
+	# Gegner freigegeben wurden (er stirbt, waehrend der Reif ihn dehnt). Die Zuweisung an eine
+	# typisierte Variable ist selbst schon der Fehler ("Trying to assign invalid previously freed
+	# instance") — sie schlaegt zu, bevor irgendein Guard greift.
+	for n: Variant in _slowed:
+		if is_instance_valid(n) and not current.has(n):
 			HitstopManager.clear_time_scale(n)
 	_slowed = current
 
 func _clear_time_dilation() -> void:
 	if _slowed.is_empty():
 		return
-	for n: Node in _slowed:
-		HitstopManager.clear_time_scale(n)
+	for n: Variant in _slowed:  # `Variant`, gleicher Grund wie in _apply_time_dilation
+		if is_instance_valid(n):
+			HitstopManager.clear_time_scale(n)
 	_slowed.clear()

@@ -785,6 +785,36 @@ Gedächtnis über den Prozess hinaus und macht aus dem Game Over eine Frage stat
 - `set_deferred` für die Hurtbox, weil der Ausfall aus einem Area-Signal kommt und damit mitten
   im Physik-Callback läuft (derselbe Fehler, der in Phase 2 den HitstopManager zerlegt hat).
 
+**Nachgereicht: drei Fehler aus dem Debugger (vom User im Spielen gefunden)**
+- `dead.gd:14 Function blocked during in/out signal` — der Dead-State wird aus
+  `hurtbox.hit_taken` betreten, also **mitten im Area-in/out-Signal**. Dort verweigert Godot das
+  direkte Setzen von `monitorable`; der Wert blieb stehen und der tote Gegner war weitere
+  45 Frames treffbar. Jetzt `set_deferred("monitorable", false)` — dieselbe Klasse Problem wie
+  beim `process_mode` im HitstopManager (Phase 2) und beim Türfeld (Phase 6). Dieselbe Zeile in
+  `Skeleton._despawn()` (Phase 9) gleich mit umgestellt.
+- `_tick_slowed: Trying to assign invalid previously freed instance` — der eigentliche Fund. Stirbt
+  ein Gegner, **während** der Reif ihn dehnt, halten `HitstopManager._frozen/_slowed` und
+  `Reif._slowed` noch Referenzen auf seine StateMachine und seinen Sprite. Alle diese Schleifen
+  liefen mit einer als `Node` **typisierten** Laufvariable — und genau diese Zuweisung ist der
+  Fehler: sie schlägt zu, **bevor** der vorhandene `is_instance_valid`-Guard gefragt wird. Jetzt
+  laufen alle vier Schleifen (`hitstop`, `_tick_frozen`, `_tick_slowed`, beide Reif-Seiten) über
+  `Variant` und prüfen danach. Dazu nehmen `HitstopManager.is_slowed()` und `time_scale_for()`
+  jetzt `Variant`: mit `Node` in der Signatur war schon der **Aufruf** mit einer freigegebenen
+  Referenz der Fehler, statt die ehrliche Antwort „nicht verlangsamt" zu geben.
+- `Integer division. Decimal part will be discarded` (3×, beim Parsen) — die Spielzeit-Formatierung
+  stand doppelt da, in `SaveData` und im `SaveManager`. Jetzt eine statische
+  `SaveData.format_frames()` mit `@warning_ignore("integer_division")`: hier **ist**
+  Ganzzahldivision gewollt (Frames → Sekunden → Minuten), und der SaveManager ruft sie auf.
+- **Verifikation:** neuer Abschnitt 12 in `phase5_sim` („Gegner stirbt WÄHREND der
+  Zeitdehnung"): Vorbedingung ist ein nachweislich gedehnter Gegner, dann stirbt er, gibt sich
+  frei — danach hält der HitstopManager keine toten Nodes mehr, der Reif kanalisiert ungestört
+  weiter, die Korruption lädt weiter auf und der Kanal endet regulär. Alle sechs Testszenen
+  laufen jetzt mit **leerem stderr** durch (außer den absichtlich provozierten `push_error` in
+  phase8/phase9) — vorher war das nie geprüft.
+- *Merker fürs Testen:* ein Skriptfehler in einer Testszene **hängt** den Lauf, statt ihn
+  fehlschlagen zu lassen (`get_tree().quit()` wird nie erreicht) und lässt einen Godot-Prozess
+  stehen. Genau dafür hat `phase9_sim` seit dieser Phase das `FRAME_BUDGET`.
+
 **Entscheidungen (und warum)**
 - *JSON statt `.tres`* (User-Entscheidung): ein `.tres` trägt den Skriptpfad im Savefile mit — ein
   Spielstand sind Spielerdaten und soll nichts ausführen können. Dazu cacht `ResourceLoader` nach
@@ -875,9 +905,10 @@ Gedächtnis über den Prozess hinaus und macht aus dem Game Over eine Frage stat
 - **Der Test räumt auf:** eigenes Verzeichnis, am Ende leer. Dazu eine **Notbremse**
   (`FRAME_BUDGET = 6000`): der Test wartet an mehreren Stellen auf Signale, ein Fehler darin
   würde headless nicht fehlschlagen, sondern ewig laufen.
-- **Regression:** phase4 (27), phase5 (51), phase6 (28), phase7 (37), phase8 (84) alle weiterhin
-  „ALLES GRUEN" — zusammen mit phase9 (135) **362 Checks**.
-- **Fensterlauf** (300 Frames, Vulkan/Forward+) fehlerlos.
+- **Regression:** phase4 (27), phase5 (**57**, inkl. des neuen Abschnitts 12), phase6 (28),
+  phase7 (37), phase8 (84) alle weiterhin „ALLES GRUEN" — zusammen mit phase9 (135)
+  **368 Checks**.
+- **Fensterlauf** (400 Frames, Vulkan/Forward+) fehlerlos, stderr leer.
 
 **Was in Phase 8 offen war und jetzt zu ist**
 - „Kein Fortschritt überlebt einen Raumwechsel": für Gegner geschlossen (`persist_id` +
