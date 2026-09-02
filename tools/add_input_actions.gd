@@ -48,6 +48,16 @@ func _initialize() -> void:
 		_pad(JOY_BUTTON_LEFT_SHOULDER),
 	])
 
+	# Weltinteraktion (ab Phase 8): Raum-Tueren mit `auto_enter = false`, ab Phase 9 die
+	# Speicherpunkte, ab Phase 11 die NPCs. F liegt fuer die WASD-Hand in Reichweite, ohne mit
+	# Angriff (E) oder Dash (Space/Shift) zu kollidieren; Enter ist die Tastatur-Zweitbelegung.
+	# Gamepad Y, weil A der Dash und die Schultertasten der Figurenwechsel sind.
+	_write(&"interact", [
+		_key(KEY_F),
+		_key(KEY_ENTER),
+		_pad(JOY_BUTTON_Y),
+	])
+
 	_write(&"debug_toggle", [_key(KEY_F1)])
 
 	ProjectSettings.save()

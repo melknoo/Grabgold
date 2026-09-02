@@ -5,8 +5,8 @@ extends CanvasLayer
 @onready var label: Label = $Label
 
 var _player: Player = null
-## Raum-Zustand (Phase 6). Optional: die Testszenen laden main.tscn zwar mit, aber das Overlay
-## soll auch in einer Szene ohne Raum funktionieren.
+## Aktueller Raum. Wird jeden Frame gegen den RoomManager geprueft, weil er sich seit Phase 8
+## unter dem Overlay weg tauschen kann. Optional: das Overlay soll auch ohne Raum funktionieren.
 var _room: Room = null
 
 func _ready() -> void:
@@ -25,7 +25,7 @@ func _process(_dt: float) -> void:
 	label.text = (
 		"FPS: %d\nFigur: %s  HP: %d/%d  Gewicht: %.1f\nState: %s\nFacing: %s\nAnim: %s [%d]\n"
 		+ "REIF: %s  Stufe %d%s\nKorruption: %.1f %%\nDash-CD: %d  Phasing: %s\n"
-		+ "Raum: %s\nDebugBoxes: %s"
+		+ "Raum: %s\nSlot %d%s  Zeit %s  Flags %d\nDebugBoxes: %s"
 	) % [
 		Engine.get_frames_per_second(),
 		figure,
@@ -42,6 +42,10 @@ func _process(_dt: float) -> void:
 		reif.dash_cooldown_left(),
 		str(reif.is_phasing()),
 		_room_text(),
+		SaveManager.active_slot,
+		"" if SaveManager.has_slot(SaveManager.active_slot) else " (leer)",
+		SaveManager.playtime_text(),
+		SaveManager.flag_count(),
 		str(Debug.show_boxes),
 	]
 
@@ -57,16 +61,20 @@ func _reif_flags(reif: Reif) -> String:
 	return ("  " + " · ".join(flags)) if not flags.is_empty() else ""
 
 
-## Platte + Tuer in einer Zeile — die beiden Werte, an denen die Feel-Abnahme von Phase 6 haengt
-## (ist das Fenster fair, ist die Platte als "schwer" lesbar?).
+## Raum-ID, Transitions-Zustand und die raumspezifische Zeile (Raum 01: Platte + Tuer).
+##
+## Das Overlay kennt Platte und Tuer seit Phase 8 NICHT mehr selbst — es fragt `debug_text()`.
+## Sonst waere es in Raum 02/03, die beides nicht haben, an `null` gescheitert.
 func _room_text() -> String:
 	if _room == null or not is_instance_valid(_room):
-		_room = get_tree().get_first_node_in_group(&"room") as Room
+		_room = RoomManager.current_room()
 	if _room == null:
 		return "-"
-	return "Platte %s  Tuer %s" % [
-		"GEDRUECKT" if _room.plate.is_pressed() else "offen",
-		("OFFEN %.1fs" % (_room.door.frames_left() / 60.0)) if _room.door.is_open() else "zu",
+	var extra: String = _room.debug_text()
+	return "%s%s%s" % [
+		_room.room_id,
+		"  WECHSEL %.2f" % RoomManager.fade_alpha() if RoomManager.is_transitioning() else "",
+		("  " + extra) if extra != "" else "",
 	]
 
 func _unhandled_input(event: InputEvent) -> void:

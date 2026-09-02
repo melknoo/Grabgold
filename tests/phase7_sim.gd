@@ -34,12 +34,14 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 func _ready() -> void:
 	var main: Node = (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	add_child(main)
-	# MUSS vor dem ersten Physik-Frame passieren: main.tscn haengt hier als Kind, und
-	# reload_current_scene() wuerde diesen Test neu starten statt den Raum.
+	# Kein Neustart nach dem Game Over: der Test prueft die Blende, nicht den Wiederaufbau.
+	# (Bis Phase 7 war das Pflicht — reload_current_scene() haette diesen Test selbst neu
+	# gestartet. Seit Phase 8 tauscht der RoomManager nur den Raum, der Schalter ist reine
+	# Testabsicht.)
 	main.restart_on_wipe = false
 	var player: Player = main.get_node("Player")
 	var party: PartyManager = main.get_node("PartyManager")
-	var room: Room = main.get_node("Room01")
+	var room: Room01 = RoomManager.current_room() as Room01
 	var fade: GameOverFade = main.get_node("GameOverFade")
 	var reif: Reif = player.reif
 	var skeleton: Skeleton = room.get_node("Skeleton")

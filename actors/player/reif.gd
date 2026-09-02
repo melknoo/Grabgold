@@ -38,6 +38,18 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if stats == null or _player == null:
 		return
+	# Raumwechsel (Phase 8): kein Input, kein Kanal. Die Zeitdehnung wird dabei ZUERST
+	# aufgeraeumt — sonst bliebe ein Gegner des alten Raums im HitstopManager als verlangsamt
+	# registriert und der neue Raum startet mit haengendem Duty-Cycle.
+	if _player.is_input_locked():
+		_channeling = false
+		_clear_time_dilation()
+		# Eine laufende Vorwarnung faellt aus. Sonst blieb der Sprite violett gefaerbt in den
+		# neuen Raum hinein und der Zwangsangriff schlug beim Ankommen zu.
+		if _tell_frames_left > 0:
+			_tell_frames_left = 0
+			_player.set_compulsion_tint(false)
+		return
 	_channeling = Input.is_action_pressed(&"reif_channel")
 	if _dash_cooldown_left > 0:
 		_dash_cooldown_left -= 1

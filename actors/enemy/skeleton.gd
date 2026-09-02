@@ -8,6 +8,14 @@ extends CharacterBody2D
 @export var attack_active_frames: int = 8
 @export var retreat_frames: int = 30
 
+## Bleibt dieser Gegner tot (Phase 9)? Leer = nein, er respawnt bei jedem Betreten des Raums —
+## das ist die Regel fuer normale Gegner und faellt seit Phase 8 von selbst so aus, weil der
+## Raum frisch instanziert wird. Gesetzt = sein Tod landet als `world_flag` im Spielstand
+## (Bosse, Quest-Kills).
+##
+## Die ID muss ueber ALLE Raeume eindeutig sein: sie ist der Flag-Name, nicht der Node-Name.
+@export var persist_id: StringName = &""
+
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var hitbox: Hitbox = $Hitbox
 @onready var hurtbox: Hurtbox = $Hurtbox
@@ -19,10 +27,28 @@ var _health: int
 var _player: Node2D
 
 func _ready() -> void:
+	# Schon erledigt (Phase 9)? Dann gar nicht erst aufbauen. Der SaveManager haelt die Flags des
+	# laufenden Spiels und wird beim Laden VOR dem Rauminstanzieren gefuellt — genau darum darf
+	# diese Frage hier im _ready stehen.
+	if persist_id != &"" and SaveManager.is_killed(persist_id):
+		_despawn()
+		return
 	add_to_group(&"enemy")
 	_health = stats.max_health
 	hurtbox.sprite = sprite
 	hurtbox.hit_taken.connect(_on_hurt)
+
+## Sofort aus dem Weg (Phase 9). `queue_free` allein genuegt nicht: der Node bliebe bis zum
+## Frame-Ende im Baum und haette mit aktiver Hurtbox und laufender StateMachine noch einen
+## Physik-Frame lang mitgespielt.
+func _despawn() -> void:
+	hide()
+	state_machine.process_mode = Node.PROCESS_MODE_DISABLED
+	hitbox.disable()
+	hurtbox.monitorable = false
+	set_deferred("collision_layer", 0)
+	$CollisionShape2D.set_deferred("disabled", true)
+	queue_free()
 
 func get_player() -> Node2D:
 	if _player == null or not is_instance_valid(_player):

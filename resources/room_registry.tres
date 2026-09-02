@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="RoomRegistry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/room_registry.gd" id="1_registry"]
+
+[resource]
+script = ExtResource("1_registry")
+rooms = Dictionary[StringName, String]({
+&"room_01": "res://scenes/rooms/room_01.tscn",
+&"room_02": "res://scenes/rooms/room_02.tscn",
+&"room_03": "res://scenes/rooms/room_03.tscn"
+})
+start_room = &"room_01"
+start_spawn = &"start"

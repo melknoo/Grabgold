@@ -609,6 +609,303 @@ größte Lücke zwischen Entwurf und Gebautem, und sie zahlt direkt aufs Kampfge
   Hinzufügen einer Figur mitbedacht werden muss.
 - Stufen 1 und 2 (Vignette, Drift) sind weiterhin **nicht vom User abgenommen** (siehe Phase 5).
 
+## Phase 8 — Raumwechsel + Transition ✅ (2026-09-02)
+
+**Erste Phase von „Schicht 1: Systemfundament".** Die Vorlage nennt sie „Phase 7"; dieses Projekt
+hat aber schon eine abgenommene Phase 7 (Korruption/Todesmodell). Schicht 1 läuft darum als
+**Phasen 8–11**: 8 = Raumwechsel, 9 = Speichern/Laden, 10 = HUD/Menüs, 11 = Audio/Dialog
+(User-Entscheidung).
+
+**Anlass:** Der offene Punkt aus Phase 6 — `room_01.tscn` hing fest in `main.tscn`, es gab keinen
+Übergang und kein Ziel in der Zielkammer. Damit fehlte auch jeder Andockpunkt für die folgenden
+Phasen: Speichern braucht einen Raum-Identifier, Audio einen Track-Wechsel pro Raum, Dialog NPCs
+in Räumen.
+
+**Die Hierarchie: `main.tscn` wird persistent**
+- Der Raum verschwindet als feste Instanz; an seiner Stelle steht ein leerer `RoomHost: Node2D`
+  mit genau 0 oder 1 Kind. Player, PartyManager und alle Overlays hingen ohnehin schon als
+  **Geschwister** des Raums dort — die Vorgabe „der Player-Node überlebt den Raumwechsel" war
+  damit schon erfüllt, ohne einen Node umzuhängen oder unter einen Autoload zu ziehen.
+- Kette: `room_01` (A, 40×24, das Puzzle) ↔ `room_02` (B, 20×12) ↔ `room_03` (C, 20×12).
+  Die `RoomExit` in der Zielkammer gibt dem Phase-6-Puzzle zum ersten Mal ein Ziel.
+
+**Architekturentscheidungen (mit Begründung)**
+- *`RoomManager` als Autoload, aber ohne feste Pfade:* die Weltszene registriert sich per
+  `bind_world(host, player, party)`. Ein `/root/Main/Player` wäre in den Testszenen falsch — die
+  hängen `main.tscn` als **Kind** unter sich (Muster seit phase4_sim). Beim `tree_exiting` des
+  Hosts lässt der Autoload die Referenzen wieder los.
+- *Kein `change_scene_to_file`:* es gäbe die alte Szene frei, bevor die Blende zu ist — und nähme
+  den Player mit, der den Wechsel gerade überleben soll.
+- *Synchron laden statt `load_threaded_request`:* der Ladevorgang liegt komplett hinter der
+  schwarzen Blende, `load()` cacht, und ein Threaded-Load mit Polling wäre headless nicht
+  deterministisch. Bei größeren Räumen nachzuziehen — an genau einer Stelle (`_swap_room`).
+- *`remove_child` **zusätzlich** zu `queue_free`:* `queue_free` lässt den Node bis zum Frame-Ende
+  im Baum; ohne das hätten kurz zwei Räume in `RoomHost` gehangen.
+- *Blende zählt Frames, kein Tween* (die Vorlage schlug einen Tween vor): Tür, Gegner-KI,
+  Angriffstiming und die Game-Over-Blende zählen im ganzen Projekt Frames, weil das
+  deterministisch und headless prüfbar ist. Ein Tween wäre der erste Zeitgeber, der es nicht ist.
+- *Input-Sperre als **ein** Flag am Player* (`set_input_locked`): drei Stellen lesen den
+  `Input`-Singleton — `player.gd` (Attack-Buffer + Bewegungsvektor der States), `reif.gd`
+  (Kanal/Dash) und `party_manager.gd` (Figurenwechsel). Ein Schalter an der Quelle statt fünf
+  Guards an den Aufrufstellen. Der Reif **räumt beim Sperren seine Zeitdehnung auf** und lässt
+  eine laufende Zwangs-Vorwarnung ausfallen: sonst bliebe ein Gegner des alten Raums im
+  `HitstopManager` als verlangsamt registriert, und der Sprite käme violett gefärbt im neuen Raum
+  an, wo der Zwangsangriff dann zuschlägt.
+- *Gegner des neuen Raums werden während der Einblendung **nicht** gefroren:* ALTTP macht es
+  genauso, und `process_mode = DISABLED` auf den Raum hätte laut Phase-5-Befund die
+  Collision-Shapes flackern lassen. Stattdessen liegen alle Spawn-Punkte außerhalb der
+  Aggro-Reichweite (70 px) des jeweiligen Skeletts — nachgerechnet: 112 px, 96 px, 144 px.
+- *`Room` als Basisklasse, Raum 01 als `Room01`:* das Skript von Raum 01 hieß bis Phase 7 selbst
+  `Room` und kannte Tür, Platte und Skelett — als Basis für drei Räume nicht tragfähig. Die Basis
+  hält nur, was der RoomManager von jedem Raum braucht (`room_id`, `size_tiles`, `bounds()`,
+  `spawn_point()`), plus `debug_text()`.
+- *Das Debug-Overlay fragt `debug_text()`* statt Platte und Tür direkt zu lesen. Ohne das wäre es
+  in Raum 02/03, die beides nicht haben, an `null` gescheitert.
+- *`spawn_point()` sucht unter den **eigenen** Kindern, nicht per Gruppe:* der alte Raum hängt im
+  Moment der Suche noch einen Frame im Baum (`queue_free`), eine Gruppensuche hätte dessen
+  gleichnamigen Punkt liefern können. Kein Treffer → Warnung + erster vorhandener Punkt, damit ein
+  Tippfehler in einer Tür-ID den Spieler nicht auf (0,0) in die Wand setzt.
+- *`RoomExit` wertet bei `auto_enter = false` jeden Physik-Frame aus,* nicht per Signal-Flanke —
+  gleicher Grund wie bei der `PressurePlate` (Phase 6): wer in der Tür stehend die Figur wechselt,
+  löst kein neues `body_entered` aus.
+- *`music_id` liegt am Raum-Node, nicht in der Registry:* sonst müsste man den Raum an zwei
+  Stellen pflegen. In Phase 8 ungenutzt und bewusst schon angelegt.
+- *Game Over läuft über den RoomManager* (`restart_at_start()`) statt `reload_current_scene()`
+  (User-Entscheidung): der Raum ist jetzt wegwerfbar, also wird er weggeworfen. Gegner respawnen
+  dabei von selbst. **Ohne Ausblende, sondern sofort schwarz** — die Game-Over-Blende hat das Bild
+  schon zugezogen; ein zweites Ausblenden von 0 nach 1 hätte den toten Raum für 18 Frames wieder
+  sichtbar gemacht, sobald der Aufrufer seine eigene Blende zurücknimmt. Der
+  `restart_on_wipe`-Schalter bleibt, ist aber **kein Selbstschutz mehr**: es wird keine Szene mehr
+  neu geladen, die einen Test neu starten könnte.
+- *Neue Input-Action `interact`* (F + Enter + Gamepad Y) über `tools/add_input_actions.gd`, die
+  alleinige Quelle der Belegung. F ist für die WASD-Hand erreichbar und kollidiert nicht mit
+  Angriff (E) oder Dash (Space/Shift); Gamepad Y, weil A der Dash und die Schultertasten der
+  Figurenwechsel sind. Gebraucht wird sie ab Phase 9 (Speicherpunkte) und 11 (NPCs) ohnehin.
+
+**Bug gefunden & behoben (vom neuen Test aufgedeckt)**
+- `actors/enemy/states/dead.gd` rief `enemy.play_anim(&"dead")`. Das hängt das Facing an und sucht
+  `dead_down` — die Todes-Animation in `skeleton_frames.tres` heißt aber **richtungslos** `dead`.
+  Seit Phase 3 lief bei **jedem** Gegnertod ein „There is no animation with name dead_down" ins
+  Log, und die Todespose war nie zu sehen. Jetzt `sprite.play(&"dead")` direkt.
+
+**Regel Null (gegen die echte ClassDB geprüft, nicht geraten)**
+- `ResourceLoader.load(path, type_hint = "", cache_mode = 1) -> Object`
+- `Node.remove_child(node)` / `Node.queue_free()`; `signal Node.tree_exiting` (ohne Argumente)
+- `signal Area2D.body_entered(body: Node2D)`; `Area2D.get_overlapping_bodies() -> Array`
+- `Camera2D.limit_left/top/right/bottom` sind **int**, dazu `limit_enabled`/`limit_smoothed`
+- `KEY_F = 70`, `KEY_ENTER = 4194309`, `JOY_BUTTON_Y = 3`
+
+**Verifikation (headless, `tests/phase8_sim.*`, 82/82 grün)**
+- Startzustand: Raum A steht in `RoomHost`, Spieler am Spawn `start`, Kamera-Limits == `bounds()`.
+- **Kette A→B→C→B→A:** je Schritt Raum-ID, Spawn-Position, **genau ein** Kind in `RoomHost`,
+  alter Raum per `is_instance_valid` **freigegeben**, Blende wieder offen, Kamera-Limits passend
+  zum jeweiligen Raummaß (640×384 vs. 320×192), Smoothing aus. `room_changed` und
+  `transition_finished` je 4×.
+- **Der Raumtausch liegt bei Alpha 1.0** — es gibt keinen Frame, in dem beide Räume sichtbar
+  wären. Zusätzlich: die Blende erreicht überhaupt voll schwarz und ist danach wieder 0.
+- **Party-Zustand überlebt:** HP unverändert, aktive Figur unverändert, Korruption überlebt und
+  sinkt nur um den regulären Abbau (37.50 → 37.46 über zwei Wechsel; der Reif baut auch hinter
+  der Blende ab, das ist gewollt).
+- **Input gesperrt:** `move_right`, `attack`, `reif_channel`, `switch_figure` und `dash`
+  gleichzeitig gedrückt → 0.00 px Bewegung, Zustand bleibt `Idle`, kein Kanal, keine Korruption,
+  kein Figurenwechsel. Gegenprobe danach: dieselbe Eingabe trägt wieder 13.1 px.
+- **Die Tür löst selbst aus:** hineinlaufen startet die Transition (`auto_enter = true`); mit
+  `auto_enter = false` tut Betreten allein nichts und erst `interact` löst aus.
+- **Gegner respawnen:** Skelett in B erledigt, über C zurück nach B → wieder da, volle Health,
+  **neue Instanz**.
+- **Unbekannte Raum-ID** wechselt nichts, hinterlässt keine hängende Transition und lässt den
+  Spieler handlungsfähig (der `push_error` im Log ist der provozierte Fehlerfall).
+- **Game Over:** beide Figuren ausgeschaltet → `party_wiped` → Blende → Neustart in Raum A am
+  Startspawn, beide Figuren stehen, Health voll, Korruption beider Figuren 0, beide Blenden
+  zurückgenommen, Input frei.
+- **Tool-Gegenprobe:** `build_room_resources.gd` baut jetzt drei Räume aus der `ROOMS`-Tabelle;
+  die Kachelbelegung von Raum 01 (`tile_map_data`) ist **md5-identisch** zur abgenommenen
+  Fassung. Byte-identisch ist die Datei nicht und kann es nicht sein — Godot vergibt
+  Sub-Resource- und `unique_id`-Werte bei jedem Speichern neu.
+- **Regression:** phase4, phase5, phase6 und phase7 alle weiterhin „ALLES GRUEN".
+- **Fensterlauf** (240 Frames, Vulkan/Forward+) fehlerlos — headless rendert keine Tiles und
+  kompiliert keine Shader, darum extra geprüft.
+
+**Offen / bekannte Punkte**
+- **Feel-Abnahme beim User steht aus:** Ist `fade_frames = 18` (0,3 s je Hälfte) richtig, oder
+  wirkt der Wechsel gehetzt bzw. träge? Fühlt sich `auto_enter` gut an, oder will die Tür einen
+  `interact`-Druck? Das sind die beiden Tuning-Achsen dieser Phase.
+- **Räume B und C sind leer** (Boden, Wände, ein Skelett) — bewusst Testgerüst, kein Content.
+- **Die `RoomExit` hat kein eigenes Sprite:** violett getöntes `tile_16.png` als Platzhalter,
+  Eintrag in `docs/assets-todo.md`. Kein geprüftes Treppen-/Torfeld vorhanden, und geraten wird
+  nicht (die Tile-Auswahl in Phase 6 war empirisch belegt).
+- **Kein Fortschritt überlebt einen Raumwechsel:** gedrückte Schalter, offene Türen und getötete
+  Gegner sind nach dem Wiederbetreten zurückgesetzt. Das Flag-System dafür kommt mit Phase 9
+  (`world_flags` in `SaveData`).
+- **Kein Musik-/Ton-Wechsel:** `Room.music_id` ist angelegt und ungenutzt, `room_changed` hat noch
+  keinen Hörer (Phase 11).
+- **`size_tiles` steht doppelt** — im Raum-Skript und in der `ROOMS`-Tabelle des Bau-Tools. Wer
+  eines ändert, muss das andere mitändern (unverändertes Thema seit Phase 6).
+
+## Phase 9 — Speichern, Laden, Game Over (abgeschlossen)
+
+Bis Phase 8 war jeder Fortschritt an das laufende Programm gebunden: Beenden hieß von vorn
+anfangen, und Game Over startete **blind** am Startraum neu. Phase 9 gibt dem Spiel ein
+Gedächtnis über den Prozess hinaus und macht aus dem Game Over eine Frage statt einer Tatsache.
+
+**Was steht**
+- **`SaveData`** (`resources/save_data.gd`) — typisierte Resource-Klasse: `version`, `room_id`,
+  `spawn_id`, `figure_index`, `health[]`, `corruption[]`, `world_flags`, `playtime_frames`,
+  `saved_at`. Plus `to_dict()`, `from_dict()`, `playtime_text()`, `summary()`.
+- **`SaveManager`** (Autoload, `globals/save_manager.gd`) — 3 Slots unter `user://saves/`,
+  `world_flags` und Spielzeit des laufenden Spiels, `capture/save_to_slot/load_from_slot/
+  slot_info/delete_slot/new_game`, Signale `saved / loaded / load_failed / game_restarted`.
+- **`SavePoint`** (`actors/props/save_point.tscn`) — Speicherpunkt in Raum A (neben dem Start)
+  und in Raum C. Schreibt den aktiven Slot auf `interact` und frischt das Ensemble auf.
+- **`ui/game_over_menu/`** — „Letzter Speicherstand" / „Neu beginnen" nach der Schwarzblende.
+- **Persistente Kills** — `Skeleton.persist_id`; das Skelett in Raum C bleibt tot, die in A und B
+  respawnen weiter. Damit ist der in Phase 8 offene Punkt „kein Fortschritt überlebt einen
+  Raumwechsel" für Gegner geschlossen.
+- **`RoomManager.enter_from_black()`** — aus `restart_at_start()` verallgemeinert; dazu
+  `player()`, `party()` und `has_room()` als Fragen an die registrierte Welt.
+- **`PartyManager.restore_all()`**, `health_array()`, `corruption_array()`, `apply_state()` und
+  das Signal `party_restored`.
+- **Welt-Stopp beim Game Over** — `Player.set_defeated()` und `RoomManager.set_room_frozen()`.
+
+**Nachgereicht: die Welt hielt beim Game Over nicht an (vom User im Spielen gefunden)**
+- Symptom: nach dem Wipe lag die Schwarzblende über dem Bild, aber **das Skelett schlug weiter
+  auf die gefallene Figur ein**. Ursache: nichts hielt den Raum an. Die Hurtbox des Players blieb
+  scharf, jeder weitere Treffer lief in `_on_hurt` mit `_health == 0` und feuerte erneut
+  `downed` → `party_wiped`; der Input wurde erst gesperrt, **nachdem** die Blende durch war.
+- Fix an drei Stellen: `main._on_party_wiped()` sperrt den Input sofort, setzt
+  `Player.set_defeated(true)` (nur `monitorable`, **nicht** die I-Frames — dieselbe Trennung wie
+  beim Phase-Dash) und ruft `RoomManager.set_room_frozen(true)`. Der Freeze läuft über
+  `process_mode` am `RoomHost` — dasselbe Mittel wie im HitstopManager und aus demselben Grund:
+  er trifft genau den Raum und lässt Player, Overlays und Blenden in Ruhe.
+- *Aufgehoben wird der Zustand nicht dort, wo er gesetzt wurde*, sondern wo die Welt wieder
+  entsteht: `_swap_room` setzt den `RoomHost` bei **jedem** Raumaufbau auf `INHERIT`, und
+  `PartyManager._activate` nimmt die Ausfall-Sperre zurück — wer das Feld betritt, ist
+  verwundbar. Damit kann kein Freeze in den nächsten Raum lecken, egal ob über Laden, „Neu
+  beginnen", `revive_all()`, `restore_all()` oder den Zwangswechsel.
+- `set_deferred` für die Hurtbox, weil der Ausfall aus einem Area-Signal kommt und damit mitten
+  im Physik-Callback läuft (derselbe Fehler, der in Phase 2 den HitstopManager zerlegt hat).
+
+**Entscheidungen (und warum)**
+- *JSON statt `.tres`* (User-Entscheidung): ein `.tres` trägt den Skriptpfad im Savefile mit — ein
+  Spielstand sind Spielerdaten und soll nichts ausführen können. Dazu cacht `ResourceLoader` nach
+  Pfad, ein Slot-Overwrite wäre im laufenden Spiel unsichtbar. Und ein später ergänztes Feld ist
+  in JSON ein `data.get(key, default)`. Die `.tres`-Regel des Projekts gilt für **Autorendaten**
+  (`TuningStats`, `ReifStats`, `RoomRegistry`), die von Hand gepflegt werden; ein Spielstand wird
+  nur geschrieben und gelesen.
+- *`from_dict()` prüft alles vor der ersten Zuweisung an die Welt* — kein Dictionary, falsche
+  `VERSION`, fehlendes `room_id`, unbekannter Raum: alles endet in `null` bzw. `load_failed`, die
+  Welt bleibt unangetastet. Ein halb angewandter Spielstand wäre schlimmer als kein Ladevorgang.
+- *Alle Zahlen laufen durch `int()`/`float()`*: JSON kennt keinen Integer, aus einer gespeicherten
+  `6` wird beim Parsen `6.0`, und `Array[int]` nimmt das nicht an.
+- *Aufteilung SaveManager ↔ RoomManager:* der eine besitzt den **Fortschritt**, der andere den
+  **Raum**. Die Abhängigkeit läuft nur in eine Richtung (SaveManager → RoomManager), und die Welt
+  holt sich der SaveManager über `RoomManager.player()/party()` statt über ein zweites
+  `bind_world` — es gibt weiter genau **eine** Registrierungsstelle (`scenes/main.gd`).
+- *Erst die Flags, dann der Raum:* ein erledigter Boss liest sein Flag in `_ready()`. Umgekehrt
+  stünde er nach dem Laden einmal da und verschwände beim nächsten Betreten.
+- *Der Speicherpunkt heilt und holt Ausgefallene zurück, wäscht aber die Korruption nicht*
+  (User-Entscheidung): die Korruption ist die Langzeitschuld des Reifs („baut extrem langsam ab",
+  Phase 5). Ein Punkt, der sie mitnimmt, macht sie folgenlos — einer, der ausgefallene Figuren
+  draußen lässt, macht den Ausfall bis zum Game Over unumkehrbar. Nur `revive_all()`
+  (Game Over / Neu beginnen) setzt sie auf 0.
+- *Aufgefrischt wird **vor** dem Schreiben*, sonst hält der Slot genau die Verletzungen fest, die
+  der Punkt gerade geheilt hat.
+- *Kein Auto-Speichern am Punkt* — anders als die `RoomExit` mit `auto_enter = true`: Speichern
+  überschreibt einen Slot, das braucht einen Tastendruck. Die Überlappung wird trotzdem **jeden
+  Physik-Frame** ausgewertet (Muster von `PressurePlate` und `RoomExit`).
+- *Gespeichert wird ein `spawn_id`, keine Position:* der Punkt nennt den `SpawnPoint` neben sich.
+  Eine rohe Position würde alte Spielstände nach einer Raumänderung in die Wand setzen.
+- *Kein Hauptmenü* (User-Entscheidung): es wäre eine eigene Szene **vor** der persistenten
+  Weltszene und damit ein eigener Umbau. Stattdessen „Neu beginnen". Die drei Slots sind angelegt
+  und über `SaveManager.active_slot` adressierbar; eine Slot-Auswahl-UI fehlt bewusst.
+- *Leerer Slot = grauer, **nicht anwählbarer** Eintrag* statt eines wirkungslosen: eine Taste, die
+  sichtbar existiert und nichts tut, liest sich als Bug.
+- *Bestätigen mit `interact` **oder** `attack`:* wer gerade gestorben ist, hat die Hand nicht
+  zwingend auf F. Beim Öffnen sperrt `main.gd` den Player-Input — sonst schlägt derselbe Druck im
+  Hintergrund noch die gefallene Figur zu. Freigegeben wird er vom Raumaufbau, nicht vom Menü.
+- *Persistente Kills sind **opt-in*** (`persist_id` leer = respawnt): ein Vertical Slice braucht
+  wiederkehrende Gegner. Die ID ist der Flag-Name und muss über alle Räume eindeutig sein.
+- *Spielzeit in Frames*, wie jeder Zeitwert im Projekt (Tür, Gegner-KI, Blenden) — und sie läuft
+  auch hinter einer Blende weiter.
+- *`SaveManager.save_dir` ist zur Laufzeit setzbar*: die Tests dürfen die echten Spielstände des
+  Entwicklers nicht anfassen (phase8_sim → `user://saves_phase8`, phase9_sim → `user://saves_test`).
+
+**Regel Null (gegen die echte ClassDB geprüft, nicht geraten)**
+- `FileAccess.open(path, flags) -> FileAccess` (static), `file_exists(path) -> bool` (static),
+  `get_open_error() -> Error` (static), `store_string(s) -> bool`, `get_as_text() -> String`
+- `DirAccess.make_dir_recursive_absolute(path) -> Error`, `remove_absolute(path) -> Error`,
+  `dir_exists_absolute(path) -> bool` (alle static)
+- `JSON.stringify(data, indent = "", sort_keys = true, full_precision = false) -> String`,
+  `JSON.parse_string(json_string) -> Variant` (beide static)
+- `Time.get_unix_time_from_system() -> float`
+- `Array.duplicate(deep = false) -> Array`, `Dictionary.duplicate(deep = false) -> Dictionary`
+
+**Verifikation (headless, `tests/phase9_sim.*`, 135/135 grün)**
+- **Speicherpunkt:** ohne Tastendruck passiert nichts; mit `interact` wird Slot 1 geschrieben, der
+  Punkt leuchtet, Health ist voll, die ausgefallene zweite Figur steht wieder — und die
+  Korruption **bleibt** (40,0 aktiv / 12,0 inaktiv).
+- **Inhalt auf Platte:** gültiges JSON, als `SaveData` lesbar, `version == 1`, `room_id room_01`,
+  `spawn_id save_a` (der Punkt, **nicht** der Raumeingang), Health beider Figuren voll und als
+  **Int** (nicht als geparster Float), Korruption beider Figuren, Spielzeit > 0, Zeitstempel.
+- **Laden:** nach Raumwechsel, Figurenwechsel, HP 2, Korruption 70 und einem zusätzlichen Flag
+  holt Slot 1 Raum, Spawn (136, 264), Figur, HP, Korruption **beider** Figuren und die Spielzeit
+  zurück; das nach dem Speichern gesetzte Flag ist weg; genau ein Raum in `RoomHost`; Blende
+  offen; Input frei; Gegenprobe: die Welt ist danach spielbar (13 px Bewegung).
+- **Drei Slots sind unabhängig:** Slot 2 hält `room_02`, während Slot 1 weiter `room_01` hält;
+  Slot 3 leer; Löschen wirkt und meldet beim zweiten Mal `false`; Slot 0 und 4 werden abgewiesen.
+- **Kaputte Spielstände:** Müll-JSON, `version 99`, unbekannter Raum, fehlendes `room_id` — jedes
+  Mal `load_from_slot() == false`, `load_failed`, unveränderte Welt und freier Input.
+  `from_dict(null)` und `from_dict("nope")` ergeben `null`.
+- **Persistente Kills:** das Skelett **ohne** `persist_id` (Raum B) ist nach Verlassen und
+  Wiederbetreten wieder da; das **mit** `persist_id` (Raum C) bleibt weg, setzt `kill:skeleton_c`,
+  ist nach „Neu beginnen" wieder da und nach dem Laden desselben Slots wieder weg.
+- **Welt-Stopp beim Wipe:** der Test stirbt in Raum B **in Aggro-Reichweite eines laufenden**
+  Skeletts (Vorbedingung: es bewegt sich, 5,5 px in 6 Frames). Nach dem Wipe ist der Raum sofort
+  eingefroren, der Spieler als ausgefallen markiert, der Input sofort gesperrt (nicht erst nach
+  der Blende), die Hurtbox nimmt nichts mehr an — und über 20 Frames bewegt sich das Skelett
+  **0,0 px** und es kommt **kein zweites `party_wiped`**. Nach dem Laden läuft der Raum wieder
+  und der Spieler ist wieder verwundbar.
+- **Game-Over-Menü, Speicherstand:** zwei Ausfälle → Blende → Menü offen, Bild schwarz, Input
+  gesperrt, Ladeeintrag vorausgewählt; Hoch/Runter wählt; Bestätigen lädt Raum C, beide Figuren
+  stehen, Health voll, **beide** Blenden zurückgenommen, Input frei, Menü unsichtbar.
+- **Game-Over-Menü, Neu beginnen:** Startraum, Startspawn, beide Figuren stehen, Korruption
+  beider Figuren 0, Flags geräumt, Spielzeit von vorn — und der Slot bleibt liegen.
+- **Game Over ohne Spielstand:** „Letzter Speicherstand" ist nicht anwählbar, „Neu beginnen" ist
+  vorausgewählt, Hoch ändert daran nichts, der Neuanfang läuft trotzdem.
+- **Der Test räumt auf:** eigenes Verzeichnis, am Ende leer. Dazu eine **Notbremse**
+  (`FRAME_BUDGET = 6000`): der Test wartet an mehreren Stellen auf Signale, ein Fehler darin
+  würde headless nicht fehlschlagen, sondern ewig laufen.
+- **Regression:** phase4 (27), phase5 (51), phase6 (28), phase7 (37), phase8 (84) alle weiterhin
+  „ALLES GRUEN" — zusammen mit phase9 (135) **362 Checks**.
+- **Fensterlauf** (300 Frames, Vulkan/Forward+) fehlerlos.
+
+**Was in Phase 8 offen war und jetzt zu ist**
+- „Kein Fortschritt überlebt einen Raumwechsel": für Gegner geschlossen (`persist_id` +
+  `world_flags`). Gedrückte Platte und offene Tür bleiben absichtlich flüchtig — das ist ein
+  **Zeit**-Puzzle, kein Schalterzustand.
+
+**Offen / bekannte Punkte**
+- **Feel-Abnahme steht aus** (weiterhin auch die aus Phase 8: `fade_frames = 18`, `auto_enter`).
+  Neu dazu: Fühlt sich der Speicherpunkt als solcher lesbar an, ohne eigenes Sprite und ohne Ton?
+  Ist „heilt, aber wäscht die Korruption nicht" im Spielen nachvollziehbar?
+- **Kein Auto-Save** — nur der Speicherpunkt schreibt. Ein Auto-Save beim Raumwechsel wäre eine
+  Zeile im `room_changed`-Handler, ändert aber den Charakter des Spiels (Speicherpunkte als
+  Ressource) und gehört darum in eine Abnahme, nicht in diese Phase.
+- **Keine Slot-Auswahl-UI und kein Hauptmenü** — die drei Slots sind adressierbar, aber im Spiel
+  erreicht man nur `active_slot`.
+- **Kein Ton beim Speichern**, keine Bestätigungsmeldung außer dem Aufleuchten des Punkts
+  (Audio-Infrastruktur fehlt weiterhin komplett, siehe `docs/assets-todo.md`).
+- **Speicherpunkt und Game-Over-Menü sind Platzhalter-Optik:** goldenes `tile_16.png`, Godots
+  Standardfont im Menü. Beides in `docs/assets-todo.md` eingetragen.
+- **Kein Schutz gegen einen von Hand editierten Spielstand** außer den Formatprüfungen — ein
+  Slot ohne stehende Figur führt zu einer Warnung und vollständiger Wiederherstellung. Prüfsummen
+  wären für einen Einzelspieler-Slice Aufwand ohne Nutzen.
+- **`playtime_frames` läuft auch im Game-Over-Menü weiter** (der Autoload zählt, solange eine
+  Welt gebunden ist). Sichtbar nur im Debug-Overlay, in einer Statistik-Anzeige müsste man es
+  anhalten.
+
 ## Nächste Phase
-- Offen. Kandidaten: Raumwechsel/Ziel, Audio-Infrastruktur (Flüstern für Korruptionsstufe 1),
-  Game-Over-Bildschirm, weitere Figuren (mit Blick auf die Lebensvorrats-Balance oben).
+- **Phase 10** — noch nicht festgelegt. Naheliegende Kandidaten aus dem bisher Offenen: ein
+  echtes Hauptmenü mit Slot-Auswahl (baut direkt auf Phase 9 auf), Audio-Infrastruktur
+  (`room_changed` hat seit Phase 8 einen Andockpunkt, `Room.music_id` liegt ungenutzt bereit)
+  oder Raum-Inhalt statt Testgerüst. Erst nach Go des Users.

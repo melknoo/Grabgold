@@ -19,6 +19,9 @@ signal party_wiped
 ## Ein Wechsel wurde verweigert, weil der Reif ihn sperrt (Korruptionsstufe 4). Ohne dieses Signal
 ## waere die Sperre voellig stumm — man druecke Q und nichts passiert, was wie ein Bug aussieht.
 signal switch_refused
+## Ein Speicherpunkt hat das Ensemble aufgefrischt (Phase 9). Andockpunkt fuer Ton/Effekt —
+## und die Stelle, an der ein Test nachweist, dass die Korruption dabei NICHT mitfaellt.
+signal party_restored
 
 @export var figures: Array[FigureProfile] = []
 @export var player: Player
@@ -47,6 +50,10 @@ func _ready() -> void:
 	player.downed.connect(_on_player_downed)
 
 func _physics_process(_delta: float) -> void:
+	# Waehrend eines Raumwechsels ist der Input gesperrt (Phase 8) — sonst koennte man mitten in
+	# der Blende die Figur tauschen und im neuen Raum stuende eine andere als beim Losgehen.
+	if player != null and player.is_input_locked():
+		return
 	if Input.is_action_just_pressed(&"switch_figure"):
 		switch_next()
 
@@ -109,11 +116,66 @@ func revive_all() -> void:
 		_corruption[i] = 0.0
 	_activate(0, true)
 
+## Speicherpunkt (Phase 9): Health voll, ausgefallene Figuren stehen wieder — die KORRUPTION
+## bleibt, bei jeder Figur. Absicht: sie ist die Langzeitschuld des Reifs ("baut extrem langsam
+## ab", Phase 5). Ein Speicherpunkt, der sie mitwaescht, macht sie folgenlos; einer, der
+## ausgefallene Figuren draussen laesst, macht den Ausfall bis zum Game Over unumkehrbar.
+func restore_all() -> void:
+	for i in _health.size():
+		_health[i] = figures[i].stats.max_health
+	if player != null:
+		player.set_health(_health[_index])
+	party_restored.emit()
+
+## Health aller Figuren (Phase 9, zum Speichern). Die AKTIVE Figur haelt ihren Wert im Player —
+## `_health[_index]` ist zwischen zwei Wechseln veraltet und wuerde die Verletzungen der
+## laufenden Sitzung verschlucken.
+func health_array() -> Array[int]:
+	var out: Array[int] = []
+	for i in _health.size():
+		out.append(player.get_health() if i == _index and player != null else _health[i])
+	return out
+
+## Korruption aller Figuren (Phase 9). Gleiche Begruendung wie oben.
+func corruption_array() -> Array[float]:
+	var out: Array[float] = []
+	for i in _corruption.size():
+		out.append(corruption_of(i))
+	return out
+
+## Ensemble-Zustand aus einem Spielstand (Phase 9). Kuerzere oder laengere Listen (Savefile aus
+## einer Fassung mit anderem Ensemble) werden zugeschnitten statt abgelehnt: der Slot ist sonst
+## unbrauchbar, obwohl Raum und Fortschritt darin noch gueltig sind.
+##
+## Eine ausgefallene Figur wird nie aktiv gesetzt — das ist dieselbe Invariante wie beim
+## Zwangswechsel (Phase 7): wer 0 HP hat, steuert nicht.
+func apply_state(index: int, health: Array[int], corruption: Array[float]) -> void:
+	for i in _health.size():
+		if i < health.size():
+			_health[i] = health[i]
+		if i < corruption.size():
+			_corruption[i] = corruption[i]
+	var target: int = clampi(index, 0, figures.size() - 1)
+	if _health[target] == 0:
+		_index = target
+		target = _next_standing(target)
+		if target < 0:
+			# Alle ausgefallen — so ein Slot kann nicht entstehen (Game Over speichert nicht),
+			# aber ein von Hand editierter waere sonst ein Spiel ohne steuerbare Figur.
+			push_warning("PartyManager: Spielstand ohne stehende Figur -> volle Wiederherstellung.")
+			revive_all()
+			return
+	_activate(target, true)
+
 ## `reset_state` false = Initialisierung (Player steht schon), true = echter Wechsel.
 func _activate(index: int, reset_state: bool) -> void:
 	_index = index
 	var profile: FigureProfile = figures[_index]
 	player.apply_profile(profile)
+	# Wer das Feld betritt, ist wieder verwundbar. Das hebt die Ausfall-Sperre aus Phase 9 auf —
+	# egal ob sie ueber `revive_all`, `restore_all`, einen geladenen Spielstand oder den
+	# Zwangswechsel zurueckgenommen wird. Es gibt damit genau EINE Stelle dafuer.
+	player.set_defeated(false)
 	if _health[_index] < 0:
 		_health[_index] = profile.stats.max_health
 	player.set_health(_health[_index])

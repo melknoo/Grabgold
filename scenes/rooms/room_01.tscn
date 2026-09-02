@@ -1,18 +1,30 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scenes/rooms/room_01.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/rooms/room_01_tiles.tscn" id="2_tiles"]
 [ext_resource type="PackedScene" path="res://actors/props/pressure_plate.tscn" id="3_plate"]
 [ext_resource type="PackedScene" path="res://actors/props/door.tscn" id="4_door"]
 [ext_resource type="PackedScene" path="res://actors/enemy/skeleton.tscn" id="5_skeleton"]
+[ext_resource type="Script" path="res://scenes/rooms/spawn_point.gd" id="6_spawn"]
+[ext_resource type="PackedScene" path="res://actors/props/room_exit.tscn" id="7_exit"]
+[ext_resource type="PackedScene" path="res://actors/props/save_point.tscn" id="8_save"]
 
 [node name="Room01" type="Node2D"]
 script = ExtResource("1_room")
+room_id = &"room_01"
+size_tiles = Vector2i(40, 24)
 
 [node name="Tiles" parent="." instance=ExtResource("2_tiles")]
 
 [node name="PlayerSpawn" type="Marker2D" parent="."]
 position = Vector2(56, 264)
+script = ExtResource("6_spawn")
+spawn_id = &"start"
+
+[node name="SpawnFromB" type="Marker2D" parent="."]
+position = Vector2(568, 184)
+script = ExtResource("6_spawn")
+spawn_id = &"from_b"
 
 [node name="Plate" parent="." instance=ExtResource("3_plate")]
 position = Vector2(88, 200)
@@ -22,3 +34,17 @@ position = Vector2(392, 200)
 
 [node name="Skeleton" parent="." instance=ExtResource("5_skeleton")]
 position = Vector2(456, 200)
+
+[node name="ExitToB" parent="." instance=ExtResource("7_exit")]
+position = Vector2(600, 184)
+target_room = &"room_02"
+target_spawn = &"start"
+
+[node name="SavePoint" parent="." instance=ExtResource("8_save")]
+position = Vector2(152, 264)
+spawn_id = &"save_a"
+
+[node name="SpawnSaveA" type="Marker2D" parent="."]
+position = Vector2(136, 264)
+script = ExtResource("6_spawn")
+spawn_id = &"save_a"

@@ -21,7 +21,9 @@ func _ready() -> void:
 	add_child(main)
 	var player: Player = main.get_node("Player")
 	var party: PartyManager = main.get_node("PartyManager")
-	var room: Room = main.get_node("Room01")
+	# Der Raum haengt seit Phase 8 nicht mehr fest in main.tscn, sondern wird vom RoomManager
+	# in `RoomHost` instanziert.
+	var room: Room01 = RoomManager.current_room() as Room01
 	var door: Door = room.door
 	var plate: PressurePlate = room.plate
 	var skeleton: Skeleton = room.get_node("Skeleton")
@@ -30,7 +32,7 @@ func _ready() -> void:
 	print("\n== 1. Der Raum steht ==")
 	var bounds: Rect2i = room.bounds()
 	check("Raum ist 640x384 px (doppelter Viewport)", bounds.size == Vector2i(640, 384), str(bounds.size))
-	check("Spieler startet am Marker", player.global_position.is_equal_approx(room.spawn_point()),
+	check("Spieler startet am Marker", player.global_position.is_equal_approx(room.spawn_point(&"start")),
 		"%s" % player.global_position)
 	check("Tuer ist zu", not door.is_open())
 	check("Platte ist offen", not plate.is_pressed())
@@ -79,7 +81,7 @@ func _ready() -> void:
 
 	print("\n== 6. Die Zeittuer laeuft ab ==")
 	# Weg von der Tuer, damit sie ungehindert schliessen kann.
-	player.global_position = room.spawn_point()
+	player.global_position = room.spawn_point(&"start")
 	await physics(door.open_frames + 6)
 	check("Tuer ist wieder zu", not door.is_open())
 	check("Tuer-Kollision ist wieder an", not door.get_node("CollisionShape2D").disabled)
@@ -93,7 +95,7 @@ func _ready() -> void:
 	await physics(60)
 	check("Tuer bleibt offen, solange der Spieler drinsteht", door.is_open(),
 		"Zaehler %d" % door.frames_left())
-	player.global_position = room.spawn_point()
+	player.global_position = room.spawn_point(&"start")
 	await physics(6)
 	check("Sobald das Feld frei ist, schliesst sie", not door.is_open())
 

@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/rooms/room.gd" id="1_room"]
+[ext_resource type="PackedScene" path="res://scenes/rooms/room_02_tiles.tscn" id="2_tiles"]
+[ext_resource type="Script" path="res://scenes/rooms/spawn_point.gd" id="3_spawn"]
+[ext_resource type="PackedScene" path="res://actors/props/room_exit.tscn" id="4_exit"]
+[ext_resource type="PackedScene" path="res://actors/enemy/skeleton.tscn" id="5_skeleton"]
+
+[node name="Room02" type="Node2D"]
+script = ExtResource("1_room")
+room_id = &"room_02"
+size_tiles = Vector2i(20, 12)
+
+[node name="Tiles" parent="." instance=ExtResource("2_tiles")]
+
+[node name="SpawnStart" type="Marker2D" parent="."]
+position = Vector2(56, 88)
+script = ExtResource("3_spawn")
+spawn_id = &"start"
+
+[node name="SpawnFromC" type="Marker2D" parent="."]
+position = Vector2(264, 88)
+script = ExtResource("3_spawn")
+spawn_id = &"from_c"
+
+[node name="ExitToA" parent="." instance=ExtResource("4_exit")]
+position = Vector2(24, 88)
+target_room = &"room_01"
+target_spawn = &"from_b"
+
+[node name="ExitToC" parent="." instance=ExtResource("4_exit")]
+position = Vector2(296, 88)
+target_room = &"room_03"
+target_spawn = &"start"
+
+[node name="Skeleton" parent="." instance=ExtResource("5_skeleton")]
+position = Vector2(168, 88)

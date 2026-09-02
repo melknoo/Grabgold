@@ -43,6 +43,13 @@ var _attack_buffer_frames_left: int = 0
 var _health: int
 var _corruption: float = 0.0
 var _refusal_frames_left: int = 0
+## Waehrend eines Raumwechsels (Phase 8) liest der Spieler keinen Input mehr. Der Schalter sitzt
+## HIER und nicht an drei Aufrufstellen, weil drei Stellen den Input-Singleton lesen: dieses
+## Skript (Attack-Buffer + Bewegungsvektor fuer die States), der Reif (Kanal/Dash) und der
+## PartyManager (Figurenwechsel). Ein Flag an der Quelle statt fuenf Guards.
+var _input_locked: bool = false
+## Keine Figur steht mehr (Phase 9). Siehe `set_defeated`.
+var _defeated: bool = false
 
 func _ready() -> void:
 	add_to_group(&"player")
@@ -131,6 +138,40 @@ func _on_hurt(damage: int, knockback: Vector2) -> void:
 		return
 	state_machine.transition_to(&"hurt", {"knockback": knockback * stats.knockback_taken_scale})
 
+## Input-Sperre setzen (RoomManager waehrend der Blende). Beim Sperren faellt die Figur sofort in
+## den Stand und nach `idle` zurueck — ein laufender Schlag oder Hitstun darf nicht mitten im
+## Raumwechsel weiterlaufen und im neuen Raum landen.
+func set_input_locked(locked: bool) -> void:
+	if _input_locked == locked:
+		return
+	_input_locked = locked
+	if not locked:
+		return
+	_attack_buffer_frames_left = 0
+	velocity = Vector2.ZERO
+	if state_machine != null and state_machine.current_state != null and not is_neutral():
+		state_machine.transition_to(&"idle")
+
+func is_input_locked() -> bool:
+	return _input_locked
+
+## Die Party ist ausgefallen (Phase 9). Der Koerper bleibt liegen, kann aber nichts mehr
+## abbekommen. Ohne das schlaegt ein Gegner hinter der Game-Over-Blende weiter zu: die Hurtbox
+## bliebe scharf, jeder Treffer liefe erneut in `_on_hurt` mit `_health == 0` und feuerte
+## `downed` -> `party_wiped` immer wieder.
+##
+## Nur `monitorable`, NICHT die I-Frames — dieselbe Trennung wie beim Phase-Dash (Phase 5): die
+## I-Frames gehoeren dem Trefferfeedback, nicht dem Weltzustand.
+##
+## `set_deferred`, weil der Ausfall aus einem Area-Signal kommt und damit mitten im
+## Physik-Callback laeuft (derselbe Fehler, der in Phase 2 den HitstopManager zerlegt hat).
+func set_defeated(on: bool) -> void:
+	_defeated = on
+	hurtbox.set_deferred("monitorable", not on)
+
+func is_defeated() -> bool:
+	return _defeated
+
 func facing_vector() -> Vector2:
 	match facing:
 		&"down":  return Vector2(0, 1)
@@ -140,6 +181,9 @@ func facing_vector() -> Vector2:
 	return Vector2(0, 1)
 
 func _physics_process(_delta: float) -> void:
+	if _input_locked:
+		_tick_refusal_tint()
+		return
 	if Input.is_action_just_pressed(&"attack"):
 		_attack_buffer_frames_left = stats.attack_buffer_frames
 	elif _attack_buffer_frames_left > 0:
@@ -166,6 +210,8 @@ func disable_hitbox() -> void:
 	hitbox.disable()
 
 func get_input_vector() -> Vector2:
+	if _input_locked:
+		return Vector2.ZERO
 	return Vector2(
 		Input.get_axis(&"move_left", &"move_right"),
 		Input.get_axis(&"move_up", &"move_down")

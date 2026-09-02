@@ -67,7 +67,8 @@ Projekt. Bei Signatur-Zweifeln gilt trotzdem Regel Null gegen die **lokal** gedu
   Layout (steuern mit WASD, austeilen mit der Maus): `move_up/down/left/right` (WASD + Pfeile),
   `attack` (**Linksklick** + E + J), `dash` (**Leertaste** + Shift + Gamepad A — wirkt nur bei
   gehaltenem Reif), `reif_channel` (**Rechtsklick** + L + rechter Trigger, **halten**),
-  `switch_figure` (Q + Schultertasten), `debug_toggle` (F1).
+  `switch_figure` (Q + Schultertasten), `interact` (**F** + Enter + Gamepad Y),
+  `debug_toggle` (F1).
   Regel fuer neue Bindings: alles, was im Kampf gedrueckt oder *gehalten* wird, muss die linke Hand
   auf WASD oder die rechte auf der Maus erreichen.
 
@@ -96,7 +97,7 @@ Layer = „was bin ich", Mask = „was scanne ich". Nur **Hitbox** aktiv (`monit
 | 5 | `player_hitbox` | Area2D Player-Angriff | 5 | 6 |
 | 6 | `enemy_hurtbox` | Area2D Gegner, verwundbar | 6 | — |
 | 7 | `enemy_hitbox` | Area2D Gegner-Angriff | 7 | 4 |
-| 8 | `interactable` | Druckplatte (Area2D) | 8 | 2 (die Platte scannt den Spieler) |
+| 8 | `interactable` | Druckplatte, Raum-Tuer (`RoomExit`), Speicherpunkt (`SavePoint`) | 8 | 2 (sie scannen den Spieler) |
 
 **Körper sind solide** (seit Phase 5): Spieler und Gegner scannen sich gegenseitig (Bit 2 ↔ Bit 3).
 Bis Phase 4 taten sie das nicht — man lief durcheinander hindurch, und der Phase-Dash unten wäre
@@ -115,16 +116,23 @@ für diesen Test kurz selbst setzen, weil `test_move` gegen die *aktuelle* Maske
 ```
 assets/{external/<packname>/,  placeholder/}   external = manuell abgelegte Packs, nie herunterladen
 docs/{progress,credits,assets-todo}.md
-globals/            Autoloads (hitstop_manager.gd, debug.gd)
-resources/          tuning_stats.gd + figure_profile.gd (class_names) + *.tres pro Aktor/Figur
+globals/            Autoloads (hitstop_manager.gd, debug.gd, room_manager.gd, save_manager.gd)
+resources/          tuning_stats.gd + figure_profile.gd + room_registry.gd + save_data.gd
+                    (class_names) + *.tres
 components/         hitbox, hurtbox, state_machine/  (wiederverwendbar)
 actors/player/      player.tscn/.gd + party_manager.gd + reif.gd + states/{idle,move,attack,hurt,dash}.gd
 actors/enemy/       enemy.tscn/.gd + states/{idle,approach,telegraph,attack,retreat,hurt}.gd
 actors/props/       door.tscn/.gd + pressure_plate.tscn/.gd (Raum-Interaktion, Phase 6)
+                    room_exit.tscn/.gd (Raum-Tuer, Phase 8)
+                    save_point.tscn/.gd (Speicherpunkt, Phase 9)
 ui/debug_overlay/   debug_overlay.tscn/.gd
 ui/corruption_overlay/  Vignette fuer Korruptionsstufe 1 (.tscn/.gd/.gdshader)
 ui/game_over/       Schwarzblende beim Game Over (Phase 7)
-scenes/             main.tscn (Bootstrap) + rooms/room_01.tscn + rooms/room_01_tiles.tscn (generiert)
+ui/game_over_menu/  Auswahl nach der Blende: Speicherstand / Neu beginnen (Phase 9)
+ui/transition_fade/ Blende des Raumwechsels (Phase 8, vom RoomManager instanziert)
+scenes/             main.tscn (persistente Weltszene) + rooms/
+scenes/rooms/       room.gd (Basis) + spawn_point.gd + room_0{1,2,3}.tscn
+                    + room_0{1,2,3}_tiles.tscn (generiert)
 tools/              Godot-Tool-Skripte, die Resources/Settings generieren (nie von Hand editieren)
 tests/              headless Verifikations-Szenen (*_sim.tscn/.gd)
 ```
@@ -224,9 +232,9 @@ Profil-`.tres` schreiben, in `PartyManager.figures` eintragen — **kein Code**.
   wer `attack_startup/active/recovery_frames` im `.tres` ändert, **muss das Tool neu laufen lassen**,
   sonst passen Anim und Stats nicht mehr zusammen.
 - `$GODOT --headless --path . --script res://tools/build_room_resources.gd` baut
-  `resources/tileset_room.tres` **und** `scenes/rooms/room_01_tiles.tscn` (reine Geometrie).
-  Das Raumlayout steht als Rechteck-Konstanten im Tool und wird beim Lauf als ASCII-Karte
-  ausgegeben — wer den Raum ändern will, ändert ihn dort. Die Tile-Auswahl ist **empirisch**
+  `resources/tileset_room.tres` **und** die `*_tiles.tscn` **aller** Räume (reine Geometrie).
+  Die Layouts stehen als Rechteck-Konstanten in der Tabelle `ROOMS` im Tool und werden beim Lauf
+  als ASCII-Karte ausgegeben — wer einen Raum ändern oder anlegen will, tut es dort. Die Tile-Auswahl ist **empirisch**
   belegt (voll deckend + selbst-nahtlos kachelbar), nicht nach Augenmaß gegriffen.
 - `$GODOT --headless --path . --script res://tools/add_input_actions.gd` legt fehlende
   Input-Actions per ProjectSettings-API an (idempotent).
@@ -243,10 +251,17 @@ Bis Phase 6 gab es **kein Game-Over** — bei 0 HP wurde die Health zurückgeset
   stehende Figur. Steht keine mehr → `party_wiped`.
 - Damit ist der Figurenwechsel **drei** Dinge: Kampf-Achse (Phase 4), Puzzle-Verb (Phase 6) und
   Lebensvorrat (Phase 7). Die Korruption bleibt bei der ausgefallenen Figur.
-- **Game Over** = `ui/game_over/` blendet in `fade_frames` (60 F) schwarz, danach startet
-  `scenes/main.gd` den Raum neu (`reload_current_scene`). `main.gd` hat dafür
-  `restart_on_wipe` — **die Testszenen setzen das auf `false`**, weil sie `main.tscn` als Kind
-  hängen und ein Reload sonst den Test selbst neu startete.
+- **Beim Wipe hält die Welt SOFORT an**, nicht erst hinter der Blende: `main.gd` sperrt den
+  Input, setzt `Player.set_defeated(true)` (Hurtbox aus) und friert den Raum ein
+  (`RoomManager.set_room_frozen(true)`, `process_mode` am `RoomHost`). Ohne das schlug der
+  Gegner hinter der Schwarzblende weiter auf die gefallene Figur ein, und jeder dieser Treffer
+  feuerte erneut `downed` → `party_wiped`. Zurückgenommen wird beides **nicht** an der Stelle,
+  sondern dort, wo die Welt wieder aufgebaut wird: `_swap_room` lässt jeden neuen Raum laufen,
+  `PartyManager._activate` macht jede Figur, die das Feld betritt, wieder verwundbar.
+- **Game Over** = `ui/game_over/` blendet in `fade_frames` (60 F) schwarz. Danach **fragt**
+  `scenes/main.gd` seit Phase 9 das `ui/game_over_menu/` (bis Phase 8 startete es blind neu).
+  `restart_on_wipe` auf `main.gd` schaltet Menü und Neustart für Testszenen ab — seit Phase 8
+  reine Testabsicht und kein Selbstschutz mehr, weil keine Szene neu geladen wird.
 - `PartyManager.revive_all()` setzt Health **und Korruption** zurück. Ohne den Korruptions-Reset
   startete man neu und stünde sofort wieder auf Stufe 4.
 
@@ -258,8 +273,10 @@ doppelte Viewport — erst dadurch hat die Kamera einen Zweck.
 - **Zwei TileMapLayer** aus `room_01_tiles.tscn` (generiert): `Floor` ohne Kollision, `Walls` mit.
   Boden liegt **überall**, auch unter den Wänden — so klafft beim Öffnen der Tür kein Loch.
 - **`Camera2D` ist Kind des Players**, nicht des Raums: der Figurenwechsel tauscht nur das Profil
-  am bestehenden Node (Phase 4), die Kamera überlebt ihn damit von selbst. Ihre Limits setzt
-  `scenes/main.gd` aus `Room.bounds()`. **Smoothing bleibt aus** (siehe „Auflösung & Look").
+  am bestehenden Node (Phase 4), die Kamera überlebt ihn damit von selbst — und seit Phase 8 auch
+  den Raumwechsel. Ihre Limits setzt der `RoomManager` bei **jedem** Raumwechsel aus
+  `Room.bounds()` (bis Phase 7: einmalig in `scenes/main.gd`). **Smoothing bleibt aus** (siehe
+  „Auflösung & Look").
 - **`PressurePlate`** löst über `TuningStats.weight` aus (Kurier 1.0, Zwerg 3.0, Schwelle 2.0) —
   damit wird der Figurenwechsel vom Kampf- zum **Puzzle-Verb**. Sie wertet die Überlappung
   **jeden Physik-Frame** aus, nicht per `body_entered`: wer auf der Platte stehend wechselt, löst
@@ -272,15 +289,115 @@ doppelte Viewport — erst dadurch hat die Kamera einen Zweck.
 - **Kein Y-Sort:** die Wandkacheln sind flache 16×16-Blöcke ohne Oberkante, es gibt nichts zu
   sortieren. Wird erst nötig, wenn Wände Höhe bekommen.
 
+## Raumwechsel (Phase 8)
+
+`scenes/main.tscn` ist die **persistente Weltszene** und wird nie gewechselt: Player,
+PartyManager, Corruption-Overlay, Game-Over-Blende und Debug-Overlay hängen dort als Geschwister
+des Raums. Der Raum selbst ist das einzige Kind von **`RoomHost`** und wird getauscht.
+
+- **`RoomManager`** (Autoload, `globals/room_manager.gd`) ist der einzige Weg in einen anderen
+  Raum: `transition_to(room_id, spawn_id)`. Ablauf: Input sperren → ausblenden → **bei voller
+  Schwärze** alten Raum freigeben und neuen laden → Spieler auf den Spawn, Kamera-Limits → wieder
+  einblenden → Input frei. Signale `room_changed(room_id)` und `transition_finished`;
+  `room_changed` ist der Andockpunkt für Audio (Autoloads koordinieren über Signale, nie über
+  direkte Referenzen aufeinander).
+- Der Autoload kennt die Weltszene **nicht statisch**, sie registriert sich per
+  `bind_world(host, player, party)` in `main.gd`. Grund: die Testszenen hängen `main.tscn` als
+  *Kind* unter sich, ein `/root/Main/Player` wäre dort falsch.
+- **Kein `change_scene_to_file`**: es gäbe die alte Szene frei, bevor die Blende zu ist — und
+  nähme den Player mit, der den Wechsel überleben muss. Geladen wird **synchron** (`load()`
+  cacht), weil der Ladevorgang komplett hinter der Blende liegt und ein Threaded-Load mit Polling
+  headless nicht deterministisch wäre.
+- Die Blende (`ui/transition_fade/`) zählt **Frames**, kein Tween — wie Tür, Gegner-KI, Angriff
+  und Game-Over-Blende, und aus demselben Grund. `fade_frames = 18` (0,3 s je Hälfte).
+- **Input-Sperre über EIN Flag am Player** (`Player.set_input_locked`): drei Stellen lesen den
+  `Input`-Singleton (Player, Reif, PartyManager) und fragen alle denselben Schalter. Beim Sperren
+  fällt die Figur in den Stand und nach `idle`; der Reif räumt seine Zeitdehnung auf, sonst bliebe
+  ein Gegner des alten Raums als verlangsamt registriert.
+- **Räume erben von `Room`** (`scenes/rooms/room.gd`): `room_id`, `size_tiles`, `music_id`,
+  `bounds()`, `spawn_point(spawn_id)` und `debug_text()`. Raum 01 ist `Room01` und ergänzt nur
+  seine Platte-Tür-Verdrahtung. Das Debug-Overlay fragt `debug_text()` und kennt keine
+  raumspezifischen Nodes mehr.
+- **Spawn-Punkte** sind `SpawnPoint`-`Marker2D` mit `spawn_id`, gesucht unter den *eigenen*
+  Kindern des Raums (nicht per Gruppe — der alte Raum hängt beim Suchen noch einen Frame im Baum).
+  Sie liegen **neben** der Tür, nicht in ihr, sonst läuft man beim Ankommen sofort zurück.
+- **Raum-Tür** = `RoomExit` (Area2D, Layer 8 / Mask 2), `@export target_room/target_spawn/`
+  `auto_enter`. Default `auto_enter = true` (ALTTP: reinlaufen genügt); auf `false` wertet sie die
+  Überlappung **jeden Physik-Frame** aus und wartet auf `interact` — gleiches Muster wie die
+  `PressurePlate` und aus demselben Grund.
+- **Gegner respawnen** von selbst, weil der Raum bei jedem Betreten frisch instanziert wird. Ein
+  Flag-System für Bosse/Quest-Kills kommt mit dem Speichern.
+- **Raum-Verzeichnis** = `resources/room_registry.tres` (`room_id` → Szenenpfad + Startraum). Ein
+  neuer Raum ist ein Eintrag dort plus ein Eintrag in der `ROOMS`-Tabelle des Bau-Tools — **kein
+  Code**.
+- **Die Kette:** `room_01` (A, 40×24, das Puzzle) ↔ `room_02` (B, 20×12) ↔ `room_03` (C, 20×12).
+  B und C sind bewusst Testgerüst, kein Content.
+
+## Speichern & Laden (Phase 9)
+
+- **`SaveData`** (`resources/save_data.gd`) ist eine typisierte Resource-**Klasse**, liegt aber
+  als **JSON** unter `user://saves/slot_N.json` — nicht als `.tres` (User-Entscheidung). Gründe:
+  ein `.tres` trägt den Skriptpfad im Savefile mit, `ResourceLoader` cacht nach Pfad (ein
+  Slot-Overwrite wäre im laufenden Spiel unsichtbar), und ein neues Feld ist in JSON ein
+  `data.get(key, default)`. Die `.tres`-Regel des Projekts gilt für **Autorendaten**
+  (`TuningStats`, `ReifStats`, `RoomRegistry`) — ein Spielstand ist das Gegenteil.
+- **`from_dict()` ist die einzige Lesestelle** und prüft **vor** der ersten Zuweisung an die
+  Welt: kein Dictionary, falsche `VERSION`, kein `room_id` → `null`. Ein kaputter Slot darf nie
+  halb angewandt werden. **JSON kennt keinen Integer** — jede Zahl läuft durch `int()`/`float()`,
+  sonst nimmt `Array[int]` den geparsten `6.0` nicht an.
+- **`SaveManager`** (Autoload) hält den **Fortschritt** — `world_flags`, Spielzeit (in Frames),
+  aktiver Slot — und ist der einzige Weg auf die Platte. Aufteilung zum `RoomManager`: der
+  besitzt den **Raum**, der SaveManager den **Fortschritt**. Die Abhängigkeit läuft **nur in eine
+  Richtung**: SaveManager ruft RoomManager, nie umgekehrt. Die Welt holt er sich über
+  `RoomManager.player()/party()` — kein zweites `bind_world`.
+- **Reihenfolge beim Laden ist Absicht:** erst `world_flags`, **dann** der Raum. Ein erledigter
+  Boss liest sein Flag in `_ready()`, das Flag muss also stehen, bevor der Raum instanziert wird.
+- Geladen wird über **`RoomManager.enter_from_black()`** (aus Phase 7 verallgemeinert): kein
+  Ausblenden, sondern ein harter Schnitt nach Schwarz. Bei Game Over ist das Bild schon zu, und
+  es gibt keinen Zustand, in dem die alte Welt beim Laden noch etwas zu zeigen hätte.
+- **`SavePoint`** (`actors/props/save_point.tscn`, Layer 8 / Mask 2) speichert **nie automatisch**
+  — anders als die `RoomExit` mit `auto_enter`: Speichern überschreibt einen Slot, das braucht
+  einen `interact`-Druck. Er wertet die Überlappung **jeden Physik-Frame** aus (gleicher Grund
+  wie `PressurePlate`). Sein `spawn_id` nennt den `SpawnPoint` **neben** ihm — geladen wird nie
+  eine rohe Position, sonst setzt ein verschobener Raum alte Spielstände in die Wand.
+- **Der Punkt frischt auf, wäscht aber nicht** (`PartyManager.restore_all()`): Health voll,
+  ausgefallene Figuren stehen wieder, **die Korruption bleibt bei jeder Figur**. Sie ist die
+  Langzeitschuld des Reifs (Phase 5) — ein Speicherpunkt, der sie mitnimmt, macht sie folgenlos.
+  Nur `revive_all()` (Game Over / Neu beginnen) setzt sie auf 0. **Aufgefrischt wird vor dem
+  Schreiben**, sonst hält der Slot genau die Verletzungen fest, die der Punkt gerade geheilt hat.
+- **Game-Over-Menü** (`ui/game_over_menu/`): „Letzter Speicherstand" (leerer Slot → grau und
+  **nicht anwählbar**, nicht bloß wirkungslos) und „Neu beginnen". Navigation `move_up/down`,
+  Bestätigen `interact` **oder** `attack` — wer gerade gestorben ist, hat die Hand nicht zwingend
+  auf F. Beim Öffnen sperrt `main.gd` den Player-Input (sonst schlägt der Bestätigungsdruck im
+  Hintergrund noch zu); freigegeben wird er vom Raumaufbau, nicht vom Menü.
+- **Persistente Kills:** `Skeleton.persist_id` leer = respawnt weiter (Regel für normale Gegner,
+  fällt seit Phase 8 von selbst so aus). Gesetzt = der Tod landet als `kill:<id>` in den
+  `world_flags`, und der Gegner baut sich beim Betreten gar nicht erst auf. Die ID ist der
+  **Flag-Name** und muss über alle Räume eindeutig sein.
+- **Ein Hauptmenü gibt es bewusst nicht:** es wäre eine eigene Szene **vor** der persistenten
+  Weltszene und damit ein eigener Umbau. Die drei Slots sind angelegt und adressierbar
+  (`SaveManager.active_slot`), eine Slot-Auswahl-UI fehlt.
+
 ## Tests
 
 - `$GODOT --headless --path . res://tests/phase4_sim.tscn` — Figurenwechsel (27 Checks).
 - `$GODOT --headless --path . res://tests/phase5_sim.tscn` — Reif (51 Checks).
 - `$GODOT --headless --path . res://tests/phase6_sim.tscn` — Raum, Platte, Tür, Kamera (26 Checks).
 - `$GODOT --headless --path . res://tests/phase7_sim.tscn` — Korruptionsstufen 3/4, Ausfall,
-  Game Over (34 Checks).
+  Game Over.
+- `$GODOT --headless --path . res://tests/phase8_sim.tscn` — Raumwechsel, Blende, Input-Sperre,
+  Gegner-Respawn, Game-Over-Neustart (84 Checks).
+- `$GODOT --headless --path . res://tests/phase9_sim.tscn` — Speicherpunkt, Slot-Inhalt, Laden,
+  drei Slots, kaputte Spielstände, persistente Kills, Welt-Stopp beim Wipe, Game-Over-Menü
+  (135 Checks).
 
-Alle vier müssen „ALLES GRUEN" melden.
+Alle sechs müssen „ALLES GRUEN" melden.
+
+**Tests fassen `user://saves` nicht an:** `SaveManager.save_dir` ist zur Laufzeit setzbar, und
+phase8/phase9_sim zeigen auf eigene Verzeichnisse (`user://saves_phase8`, `user://saves_test`).
+Sonst würde ein Testlauf die echten Spielstände überschreiben. `phase9_sim` hat außerdem eine
+**Notbremse** (`FRAME_BUDGET`): es wartet an mehreren Stellen auf Signale, und ein Fehler darin
+würde headless nicht fehlschlagen, sondern ewig laufen.
 
 Tests laufen als **Szene**, nicht per `--script`: bei `--script` registriert Godot die Autoloads
 nicht, und `Hitbox`/`Hurtbox` referenzieren `Debug` → Compile-Error vor dem ersten Check.
