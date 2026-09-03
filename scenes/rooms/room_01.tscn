@@ -13,6 +13,7 @@
 script = ExtResource("1_room")
 room_id = &"room_01"
 size_tiles = Vector2i(40, 24)
+music_id = &"dungeon"
 
 [node name="Tiles" parent="." instance=ExtResource("2_tiles")]
 

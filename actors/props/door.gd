@@ -15,6 +15,10 @@ signal door_closed
 ## 240 F = 4 s @60: Kurier (95 px/s) braucht fuer die 304 px ~192 F, der Zwerg (58 px/s) ~314 F.
 @export var open_frames: int = 240
 
+## Das Pack hat KEINEN Tuerklang. `door_move` ist ein schwerer Aufprall; beim Schliessen laeuft
+## derselbe Klang tiefer — dieselbe Tuer, andere Richtung. Eingetragen in docs/assets-todo.md.
+const CLOSE_PITCH := 0.8
+
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _blocker: Area2D = $Blocker
@@ -40,6 +44,7 @@ func open_for(frames: int) -> void:
 	# ("Disabling a CollisionObject during a physics callback").
 	_shape.set_deferred("disabled", true)
 	_sprite.visible = false
+	AudioManager.play(&"door_move")
 	door_opened.emit()
 
 func _physics_process(_delta: float) -> void:
@@ -57,4 +62,5 @@ func _physics_process(_delta: float) -> void:
 	_open = false
 	_shape.set_deferred("disabled", false)
 	_sprite.visible = true
+	AudioManager.play(&"door_move", CLOSE_PITCH)
 	door_closed.emit()

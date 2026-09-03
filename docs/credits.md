@@ -16,6 +16,11 @@
   Raum: `Backgrounds/Tilesets/Interior/TilesetInteriorFloor.png` (Boden + Wand,
   → `resources/tileset_room.tres`) sowie `Backgrounds/Tilesets/TilesetDungeon.png`
   (Tür- und Druckplatten-Sprites).
+- **Ab Phase 10 auch der komplette Ton** aus `Audio/`: 18 Effekt-IDs aus `Sounds/` (Hit & Impact,
+  Whoosh & Slash, Alert, Magic & Skill, Menu, Voice) plus `Jingles/Success1.wav`, zwei
+  Musikstücke (`Musics/21 - Dungeon.ogg`, `Musics/40 - Crypt.ogg`) und `Jingles/GameOver.wav`.
+  Die vollständige Zuordnung „Spielereignis → Datei" steht in den Tabellen `SOUNDS` und `MUSIC`
+  in `tools/build_audio_resources.gd` und nirgends sonst.
 - **Abgelegt unter:** `assets/external/Ninja Adventure - Asset Pack/`
 - **Eingebunden am:** 2026-08-20
 

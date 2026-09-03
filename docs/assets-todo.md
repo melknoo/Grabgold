@@ -32,13 +32,34 @@ nachmalen, nichts herunterladen.
 - [ ] **Knight Links/Rechts** visuell bestätigen. Beleg bisher rein aus dem Sheet: `Idle` col2 ist
       der exakte Spiegel von col3, und im `Attack` zeigt die Waffen-Ausdehnung col2=links /
       col3=rechts. Falls im Spiel gespiegelt: `DIRS` in `tools/build_figure_resources.gd` tauschen.
-- [ ] **Fluestern im Sound-Mix (Korruptionsstufe 1, Phase 5)** — der zweite Teil des Stufe-1-Feedbacks
-      fehlt noch. Umgesetzt ist nur die Vignette (`ui/corruption_overlay/`). Grund: das Projekt hat
-      bislang **keinerlei Audio-Infrastruktur** — dafuer waeren Audio-Bus-Layout (eigener Bus fuer
-      den Fluester-Layer, damit die Lautstaerke an die Korruption koppelbar ist), ein
-      AudioStreamPlayer-Autoload und ein Loop-Setup noetig. Kandidaten liegen im Pack bereit:
-      `Audio/Sounds/Magic & Skill/Strange.wav` und `Spirit.wav`, ergaenzend `Voice/Voice*.wav`
-      (verfremdet) sowie `Musics/14 - Curse.ogg` als Unterbett.
+- [ ] **Fluestern im Sound-Mix (Korruptionsstufe 1, Phase 5)** — weiterhin offen, aber nicht mehr
+      blockiert. Der Grund von damals ("das Projekt hat keinerlei Audio-Infrastruktur") ist mit
+      Phase 10 weg: Bus-Layout, `AudioManager`-Autoload und ein gehaltener Klang stehen. Was noch
+      fehlt, ist **eine Entscheidung, die man hoeren muss**, und ein zweiter Loop-Platz: der
+      `AudioManager` hat genau EINEN, und der gehoert dem kanalisierenden Reif. Ein
+      korruptionsgekoppelter Fluester-Layer braucht einen eigenen Abspieler, dessen Lautstaerke
+      an `Player.get_corruption()` haengt. Kandidaten unveraendert:
+      `Audio/Sounds/Magic & Skill/Strange.wav` (in Phase 10 als `reif_compel` in Gebrauch) und
+      `Spirit.wav` (als `reif_loop` in Gebrauch), ergaenzend `Voice/Voice*.wav` (verfremdet)
+      sowie `Musics/14 - Curse.ogg` als Unterbett.
+- [ ] **Kein Tuerklang im Pack** (Phase 10) — `Audio/Sounds/` hat nichts, was nach Tuer klingt.
+      Behelf: `Hit & Impact/Impact3.wav` als schwerer Aufprall, beim Schliessen derselbe Klang
+      mit Pitch 0,8 (`Door.CLOSE_PITCH`) — dieselbe Tuer, andere Richtung. Traegt, ist aber kein
+      Stein auf Stein. Kein Ersatz im Pack vorhanden.
+- [ ] **Die 18 Klangzuordnungen sind nach Ordnernamen gewaehlt, nicht nach Gehoer** (Phase 10).
+      Belegt ist nur, dass jede Datei existiert, importiert ist und am richtigen Ereignis haengt
+      (`tests/phase10_sim.tscn`). Ob `Voice/Voice9.wav` wirklich wie eine fallende Figur klingt
+      und ob `Magic & Skill/Magic4.wav` eine neue Korruptionsstufe traegt, entscheidet die
+      Feel-Abnahme. Aendern heisst: Zeile in der Tabelle `SOUNDS` in
+      `tools/build_audio_resources.gd` tauschen, Tool laufen lassen — kein Code.
+- [ ] **Keine Ambience und keine Fussschritte** (Phase 10) — bewusst. `Sounds/Ambient/` (Wind,
+      Rain, River) und Schrittklaenge waeren ein Dauerbett, das man erst beurteilen kann, wenn
+      die Raeume echter Inhalt sind statt Testgeruest. Fussschritte bruechten ausserdem einen
+      Taktgeber im `Move`-State.
+- [ ] **Nur zwei Musikstuecke** (Phase 10): `21 - Dungeon.ogg` (Raum A) und `40 - Crypt.ogg`
+      (Raum B und C). Kein Kampfstueck, obwohl `17 - Fight.ogg` und `34 - Fight.ogg` bereitliegen
+      — ein Kampfwechsel braucht einen Aggro-Zustand ueber alle Gegner eines Raums, und den gibt
+      es nicht. `music_id` steht pro Raum bereit, ein drittes Stueck ist eine Zeile.
 - [ ] **Optionaler Kanal-Effekt fuer den Reif** — solange kanalisiert wird, gibt es aktuell kein
       Sprite-Feedback am Spieler (nur die Vignette ab Stufe 1). Kandidat im Pack:
       `FX/Magic/Aura/` bzw. `FX/Magic/Circle/`. Bewusst offen: erst nach der Feel-Abnahme
@@ -77,3 +98,6 @@ nachmalen, nichts herunterladen.
 | `RoomExit` = `tile_16.png` violett getoent | Treppe/Durchgang aus `TilesetDungeon.png` | 8 | Platzhalter |
 | `SavePoint` = `tile_16.png` gold getoent | Schrein/Altar aus `TilesetDungeon.png` | 9 | Platzhalter |
 | Game-Over-Menue mit Standardfont | CC0-Pixelfont als projektweites `Theme` | 9 | Platzhalter |
+| Tuerklang = `Hit & Impact/Impact3.wav` (+ Pitch 0,8 zum Schliessen) | echter Stein-/Torklang (im Pack nicht vorhanden) | 10 | Behelf |
+| 18 Klang-IDs nach Ordnernamen gewaehlt | Auswahl nach Gehoer in der Feel-Abnahme | 10 | ungehoert |
+| Korruptionsstufe 1 = nur Vignette | + Fluester-Layer (Infrastruktur steht ab Phase 10, zweiter Loop-Platz fehlt) | 5/10 | Feedback unvollstaendig |

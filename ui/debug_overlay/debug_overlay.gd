@@ -25,7 +25,8 @@ func _process(_dt: float) -> void:
 	label.text = (
 		"FPS: %d\nFigur: %s  HP: %d/%d  Gewicht: %.1f\nState: %s\nFacing: %s\nAnim: %s [%d]\n"
 		+ "REIF: %s  Stufe %d%s\nKorruption: %.1f %%\nDash-CD: %d  Phasing: %s\n"
-		+ "Raum: %s\nSlot %d%s  Zeit %s  Flags %d\nDebugBoxes: %s"
+		+ "Raum: %s\nSlot %d%s  Zeit %s  Flags %d\n"
+		+ "Musik: %s%s  SFX: %s (%d)  Loop: %s\nDebugBoxes: %s"
 	) % [
 		Engine.get_frames_per_second(),
 		figure,
@@ -46,8 +47,19 @@ func _process(_dt: float) -> void:
 		"" if SaveManager.has_slot(SaveManager.active_slot) else " (leer)",
 		SaveManager.playtime_text(),
 		SaveManager.flag_count(),
+		_or_dash(AudioManager.current_music()),
+		"  BLENDE" if AudioManager.is_music_fading() else "",
+		_or_dash(AudioManager.last_played()),
+		AudioManager.active_sfx_count(),
+		_or_dash(AudioManager.loop_id()),
 		str(Debug.show_boxes),
 	]
+
+
+## Leere StringName lesbar machen. Ohne das steht im Overlay eine Leerstelle, und eine
+## Leerstelle sieht wie ein Fehler aus statt wie "gerade nichts".
+func _or_dash(id: StringName) -> String:
+	return String(id) if id != &"" else "-"
 
 
 ## Was die hohen Korruptionsstufen gerade tun (Phase 7). Ohne das sieht ein Zwangsangriff wie

@@ -127,9 +127,11 @@ für diesen Test kurz selbst setzen, weil `test_move` gegen die *aktuelle* Maske
 ```
 assets/{external/<packname>/,  placeholder/}   external = manuell abgelegte Packs, nie herunterladen
 docs/{progress,credits,assets-todo}.md
-globals/            Autoloads (hitstop_manager.gd, debug.gd, room_manager.gd, save_manager.gd)
+globals/            Autoloads (hitstop_manager.gd, debug.gd, room_manager.gd, save_manager.gd,
+                    audio_manager.gd)
 resources/          tuning_stats.gd + figure_profile.gd + room_registry.gd + save_data.gd
-                    (class_names) + *.tres
+                    + audio_bank.gd (class_names) + *.tres
+                    + default_bus_layout.tres (generiert, Phase 10)
 components/         hitbox, hurtbox, state_machine/  (wiederverwendbar)
 actors/player/      player.tscn/.gd + party_manager.gd + reif.gd + states/{idle,move,attack,hurt,dash}.gd
 actors/enemy/       enemy.tscn/.gd + states/{idle,approach,telegraph,attack,retreat,hurt}.gd
@@ -249,6 +251,13 @@ Profil-`.tres` schreiben, in `PartyManager.figures` eintragen — **kein Code**.
   belegt (voll deckend + selbst-nahtlos kachelbar), nicht nach Augenmaß gegriffen.
 - `$GODOT --headless --path . --script res://tools/add_input_actions.gd` legt fehlende
   Input-Actions per ProjectSettings-API an (idempotent).
+- `$GODOT --headless --path . --script res://tools/build_audio_resources.gd` baut
+  `resources/default_bus_layout.tres` (Master/Music/SFX) **und** `resources/audio_bank.tres`
+  und setzt `audio/buses/default_bus_layout` in den ProjectSettings. Die Zuordnung
+  „Spielereignis → Datei im Pack" steht als Tabellen `SOUNDS`/`MUSIC` im Tool und **nirgends
+  sonst** — ein neuer Klang ist eine Zeile dort plus ein `AudioManager.play(&"id")`.
+  Ein `AudioBusLayout` hat **keine skriptbaren Properties** (gegen die Klassen-DB geprüft), er
+  ist gar nicht von Hand schreibbar und muss vom `AudioServer` erzeugt werden.
 - Sheet-Konvention im ganzen Pack: **Spalte = Richtung** (0=down, 1=up, 2=left, 3=right),
   **Zeile = Frame**. Gilt für NinjaGreen (32×32) *und* `Actor/Character/*` (16×16).
   Achtung: `Actor/Character/*` hat nur **1 Attack-Frame** (Sheet 64×16), NinjaGreen hat 4.
@@ -389,6 +398,63 @@ des Raums. Der Raum selbst ist das einzige Kind von **`RoomHost`** und wird geta
   Weltszene und damit ein eigener Umbau. Die drei Slots sind angelegt und adressierbar
   (`SaveManager.active_slot`), eine Slot-Auswahl-UI fehlt.
 
+## Ton (Phase 10)
+
+Bis Phase 9 war das Spiel **vollständig stumm**. `globals/audio_manager.gd` (Autoload
+`AudioManager`) ist seither der **einzige** Ort, an dem Klang abgespielt wird.
+
+- **Warum ein Autoload:** Musik muss den Raumwechsel überleben, um den es gerade geht — dieselbe
+  Begründung, die in Phase 8 die Blende in den `RoomManager` gelegt hat. `PROCESS_MODE_ALWAYS`,
+  damit weder Hitstop noch der Game-Over-Freeze (Phase 9) den Ton abreißen lassen.
+- **Aufteilung der Autoloads:** RoomManager = Raum, SaveManager = Fortschritt, AudioManager =
+  Ton. Der AudioManager hängt an `RoomManager.room_changed` und liest `Room.music_id` — über ein
+  **Signal**, nie über eine direkte Referenz, und nur in diese Richtung. Der `AudioManager`-
+  Autoload muss darum in `project.godot` **nach** `RoomManager` stehen.
+- **Nicht positional** (`AudioStreamPlayer`, nicht `AudioStreamPlayer2D`): die Kamera folgt dem
+  Spieler, ein Raum ist maximal der doppelte Viewport — alles Hörbare ist auf dem Bild.
+  Positionaler Ton hätte Abspieler an jeden Aktor gehängt, und der Manager wäre nicht mehr die
+  einzige Stelle.
+- **Pegel liegen auf den BUSSEN** (Master / Music -9 dB / SFX 0 dB, im generierten Layout), die
+  Abspieler-Lautstärke gehört ganz der Kreuzblende der Musik. Zur Laufzeit über
+  `AudioManager.set_bus_db` — eine Optionen-UI gibt es noch nicht.
+- **Ein Klang pro ID pro Physik-Frame.** Zwei Gegner, die im selben Frame getroffen werden, sind
+  zwei Aufrufe von `hit_enemy`; deckungsgleich addiert klingt das nach einem Knacken statt nach
+  zwei Treffern. Pool aus 12 Abspielern, round-robin — ein abgeschnittener alter Klang ist besser
+  als ein verschluckter neuer.
+- **Der Reif fährt in den Pitch.** `Skeleton.play_sound(id)` fragt
+  `HitstopManager.time_scale_for(state_machine)` und übergibt den Faktor als `pitch`: ein
+  zeitgedehnter Gegner klingt tiefer. Das ist die einzige Stelle, an der der Reif hörbar auf
+  etwas anderes als sich selbst wirkt.
+- **`Hitbox.hit_sound` ist ein `@export` am Node**, kein Zweig im Code: die Hitbox ist der eine
+  Trichter, durch den **jeder** Treffer läuft. Wer zuschlägt, sagt die Szene
+  (`player.tscn` → `hit_enemy`, `skeleton.tscn` → `hit_player`). Gespielt wird **nur, wenn
+  `take_hit` `true` liefert** — ein Klang, den I-Frames abgeprallt haben, wäre eine Lüge.
+- **Gehaltener Klang:** genau **einer** (`start_loop`/`stop_loop`, der kanalisierende Reif).
+  `start_loop` ist idempotent, sonst stotterte er jeden Frame; die WAV-Schleife läuft über
+  `finished` → neu anwerfen, weil das `loop_mode` in der `.import` des Packs liegt. Der Reif
+  räumt ihn bei Input-Sperre auf — sonst summt er durch die Blende in den nächsten Raum.
+- **Musik: gleiche ID = kein Neustart.** Die wichtigste Regel von `play_music`. Die Kette ist
+  A `dungeon` ↔ B `crypt` ↔ C `crypt`; ein Stück, das an jeder Tür von vorn anfängt, verrät die
+  Raumgrenze. Kreuzblende über zwei Abspieler, **in Frames** gezählt (`music_fade_frames = 45`)
+  wie Tür, Gegner-KI und beide Blenden. Leere `music_id` = ausblenden.
+- **Ogg-Schleife setzt der Manager beim Einhängen** (`_apply_music_stream`), nicht das Bau-Tool:
+  in der `.tres` steht nur eine `ExtResource`-Referenz, das `loop`-Flag des Streams lebt in der
+  `.ogg.import` des Packs (dort `false`) und wird von `ResourceSaver` nicht mitgeschrieben.
+- **Jingles** (Game Over) haben einen eigenen Abspieler auf dem Musik-Bus: `play_jingle` stellt
+  das Stück ab, und `stop_music` darf den Jingle nicht mit abräumen. `scenes/main.gd` würgt ihn
+  ab, bevor eine neue Welt aufgebaut wird.
+- **`AudioManager.enabled = false`** schaltet stumm, lässt die **Buchführung** aber laufen
+  (`current_music`, `music_starts`, `play_count`, Dedup, Pitch). Zwei Gründe: es ist der Anfang
+  der Stummschaltung, die ein Optionsmenü braucht — und die Suiten phase4..9 setzen es, siehe
+  unten.
+
+**Godot-Eigenheit, die man kennen muss:** endet der Prozess, **während ein Ogg spielt**, stehen
+im Log `WARNING: ObjectDB instances leaked at exit` und `ERROR: 2 resources still in use at
+exit`. In einem Projekt aus zwölf Zeilen ohne eine Zeile dieses Autoloads nachgestellt, in beiden
+Audio-Treibern (Fenster wie headless), und auch mit `stop()` + `stream = null` kurz vor dem Ende
+nicht abstellbar. Ein **geladenes, nicht abgespieltes** Ogg ist dagegen sauber. Kein Leck im
+laufenden Spiel — aber der Grund, warum die Testsuiten stumm laufen.
+
 ## Tests
 
 - `$GODOT --headless --path . res://tests/phase4_sim.tscn` — Figurenwechsel (27 Checks).
@@ -401,14 +467,26 @@ des Raums. Der Raum selbst ist das einzige Kind von **`RoomHost`** und wird geta
 - `$GODOT --headless --path . res://tests/phase9_sim.tscn` — Speicherpunkt, Slot-Inhalt, Laden,
   drei Slots, kaputte Spielstände, persistente Kills, Welt-Stopp beim Wipe, Game-Over-Menü
   (135 Checks).
+- `$GODOT --headless --path . res://tests/phase10_sim.tscn` — Busse, Bank, Dedup, Pool, Pitch,
+  gehaltener Klang, Kreuzblende, „gleiche ID startet nicht neu", und dass jedes bisher stumme
+  Ereignis einen Klang anwirft (120 Checks).
 
-Alle sechs müssen „ALLES GRUEN" melden.
+Alle sieben müssen „ALLES GRUEN" melden (**488 Checks**).
+
+**Tests laufen stumm.** `phase4..9_sim` setzen `AudioManager.enabled = false` **vor**
+`add_child(main)` — dort betritt der Bootstrap den Startraum und würfe schon Musik an. Grund ist
+die Godot-Eigenheit oben: eine laufende Ogg-Wiedergabe hinterlässt beim Beenden zwei Fehlerzeilen,
+und sechs Suiten, die keinen Ton prüfen, sollen die nicht erben. Die Buchführung des Managers
+läuft stumm unverändert weiter, die Suiten verhalten sich also identisch. `phase10_sim` schaltet
+für **einen** Abschnitt echten Ton ein — dort ausschließlich **WAV**-Effekte, nie ein Ogg.
 
 **Tests fassen `user://saves` nicht an:** `SaveManager.save_dir` ist zur Laufzeit setzbar, und
-phase8/phase9_sim zeigen auf eigene Verzeichnisse (`user://saves_phase8`, `user://saves_test`).
+phase8/9/10_sim zeigen auf eigene Verzeichnisse (`user://saves_phase8`, `user://saves_test`,
+`user://saves_phase10`).
 Sonst würde ein Testlauf die echten Spielstände überschreiben. `phase9_sim` hat außerdem eine
 **Notbremse** (`FRAME_BUDGET`): es wartet an mehreren Stellen auf Signale, und ein Fehler darin
-würde headless nicht fehlschlagen, sondern ewig laufen.
+würde headless nicht fehlschlagen, sondern ewig laufen. `phase10_sim` hat sie aus demselben
+Grund.
 
 Tests laufen als **Szene**, nicht per `--script`: bei `--script` registriert Godot die Autoloads
 nicht, und `Hitbox`/`Hurtbox` referenzieren `Debug` → Compile-Error vor dem ersten Check.

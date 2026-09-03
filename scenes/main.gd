@@ -38,6 +38,10 @@ func _on_party_wiped() -> void:
 	player.set_input_locked(true)
 	player.set_defeated(true)
 	RoomManager.set_room_frozen(true)
+	# Harter Schnitt statt Ausblende: die Welt hoert in derselben Zeile auf, in der der Raum
+	# einfriert. Der Jingle stellt das Stueck ab — beides gleichzeitig ist Krach, und eine
+	# weiterlaufende Dungeonmusik hinter dem Tod liest sich wie ein haengender Frame.
+	AudioManager.play_jingle(&"game_over")
 	game_over.start()
 
 ## Das Bild ist schwarz. Bis Phase 8 wurde hier blind neu gestartet; seit Phase 9 entscheidet
@@ -51,6 +55,8 @@ func _on_fade_finished() -> void:
 	game_over_menu.open(SaveManager.active_slot, SaveManager.slot_info(SaveManager.active_slot))
 
 func _on_load_requested(slot: int) -> void:
+	# Der Jingle darf nicht unter die Musik des neu aufgebauten Raums laufen.
+	AudioManager.stop_jingle()
 	if not SaveManager.load_from_slot(slot):
 		# Slot in der Zwischenzeit kaputt oder verschwunden: das Menue bleibt zustaendig, statt
 		# den Spieler in einer schwarzen Szene mit gesperrtem Input sitzen zu lassen.
@@ -64,6 +70,7 @@ func _on_restart_requested() -> void:
 	# Der Raum ist seit Phase 8 wegwerfbar — also wird er weggeworfen, statt die ganze Szene neu
 	# aufzubauen. Gegner respawnen dabei von selbst (frische Instanz), und der Player-Node samt
 	# Kamera bleibt derselbe.
+	AudioManager.stop_jingle()
 	SaveManager.new_game()
 	game_over.reset()
 

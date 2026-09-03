@@ -10,6 +10,9 @@ func enter(_msg: Dictionary = {}) -> void:
 	if p:
 		enemy.face_toward(p.global_position)
 	enemy.play_anim(&"attack")
+	# Bis Phase 9 war der Telegraph rein visuell. Wer auf die eigene Figur schaut, hat ihn
+	# verpasst — Lesbarkeit ist der ganze Zweck dieses States.
+	enemy.play_sound(&"enemy_alert")
 	_t = enemy.telegraph_frames
 	_elapsed = 0
 

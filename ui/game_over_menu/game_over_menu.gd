@@ -68,7 +68,10 @@ func move_selection(step: int) -> void:
 	var next: int = clampi(_index + step, Option.LOAD, Option.RESTART)
 	if next == Option.LOAD and not _can_load:
 		return  # ein leerer Slot ist nicht anwaehlbar, nicht nur nicht ausfuehrbar
+	if next == _index:
+		return  # am Rand der Liste passiert nichts, also klingt auch nichts
 	_index = next
+	AudioManager.play(&"menu_move")
 	_refresh()
 
 ## Den gewaehlten Eintrag ausloesen. Das Menue schliesst sich dabei selbst: wer darauf hoert,
@@ -76,6 +79,7 @@ func move_selection(step: int) -> void:
 func confirm() -> void:
 	if not _open:
 		return
+	AudioManager.play(&"menu_confirm")
 	close()
 	if _index == Option.LOAD:
 		load_requested.emit(_slot)

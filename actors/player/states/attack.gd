@@ -7,6 +7,9 @@ func enter(_msg: Dictionary = {}) -> void:
 	player.sprite.stop()
 	player.sprite.frame = 0
 	player.animation_player.play(&"attack")
+	# Der Schwung, nicht der Treffer: der kommt aus der Hitbox und nur, wenn er landet. Ein
+	# Schlag ins Leere soll hoerbar ins Leere gehen.
+	AudioManager.play(&"attack_swing")
 	player.animation_player.animation_finished.connect(_on_finished, CONNECT_ONE_SHOT)
 
 func exit() -> void:

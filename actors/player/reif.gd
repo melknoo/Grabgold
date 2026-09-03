@@ -28,6 +28,9 @@ var _slowed: Array[Node] = []
 var _mask_restore_pending: bool = false
 ## Restframes der Vorwarnung des Zwangsangriffs (Stufe 3). 0 = kein Zwang unterwegs.
 var _tell_frames_left: int = 0
+## Korruptionsstufe des letzten Frames (Phase 10). Nur fuer den Klang beim STEIGEN — siehe
+## `_tick_level_sound`.
+var _last_level: int = 0
 
 func _ready() -> void:
 	_player = get_parent() as Player
@@ -44,6 +47,10 @@ func _physics_process(delta: float) -> void:
 	if _player.is_input_locked():
 		_channeling = false
 		_clear_time_dilation()
+		# Der gehaltene Klang muss mit dem Kanal enden, nicht mit dem Raum: sonst summt der Reif
+		# durch die Blende in den naechsten Raum hinein (dieselbe Aufraeumpflicht wie eine Zeile
+		# darueber bei der Zeitdehnung).
+		AudioManager.stop_loop()
 		# Eine laufende Vorwarnung faellt aus. Sonst blieb der Sprite violett gefaerbt in den
 		# neuen Raum hinein und der Zwangsangriff schlug beim Ankommen zu.
 		if _tell_frames_left > 0:
@@ -57,11 +64,14 @@ func _physics_process(delta: float) -> void:
 		_restore_body_mask()
 	if _channeling:
 		_apply_time_dilation()
+		AudioManager.start_loop(&"reif_loop")
 		_tick_corruption(stats.corruption_per_second * _player.stats.corruption_gain_scale * delta)
 	else:
 		_clear_time_dilation()
+		AudioManager.stop_loop()
 		_tick_corruption(-stats.corruption_decay_per_second * delta)
 	# Nach dem Korruptions-Tick, damit eine gerade erreichte Stufe sofort greift.
+	_tick_level_sound()
 	_tick_compulsion(delta)
 
 func is_channeling() -> bool:
@@ -169,6 +179,25 @@ func _tick_compulsion(delta: float) -> void:
 		return
 	if rng.randf() < stats.compulsion_per_second * delta:
 		_tell_frames_left = maxi(stats.compulsion_tell_frames, 1)
+		# Die Vorwarnung war bis Phase 9 rein visuell (violettes Flackern). Wer im Kampf auf den
+		# Gegner schaut, hat sie verpasst — und ein Zwangsangriff ohne Vorwarnung ist ein Bug,
+		# kein Fluch.
+		AudioManager.play(&"reif_compel")
+
+## Eine neu erreichte Korruptionsstufe ist der Moment, in dem der Reif etwas nimmt. Nur beim
+## STEIGEN: der Abbau (0,4/s) ist ein Nachlassen ueber Minuten, kein Ereignis.
+func _tick_level_sound() -> void:
+	var lvl: int = level()
+	if lvl > _last_level:
+		AudioManager.play(&"corruption_up")
+	_last_level = lvl
+
+## Stufe uebernehmen, OHNE Klang. Aufrufer ist `PartyManager._activate` — Figurenwechsel,
+## Wiederbelebung, Speicherpunkt und geladener Spielstand aendern die Korruption des Spielers,
+## ohne dass die Figur gerade eine Stufe erreicht haette. Ohne diesen Abgleich chirpte jeder
+## Wechsel auf eine schon korrumpierte Figur.
+func sync_level() -> void:
+	_last_level = level()
 
 func _tick_corruption(amount: float) -> void:
 	if is_zero_approx(amount):

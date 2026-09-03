@@ -65,6 +65,7 @@ func switch_next() -> void:
 	if not player.can_switch():
 		# Handlungsfaehig, aber der Reif sperrt (Stufe 4) -> das ist eine Aussage, kein Nichts.
 		player.flash_refusal()
+		AudioManager.play(&"switch_refused")
 		switch_refused.emit()
 		return
 	var next: int = _next_standing(_index)
@@ -73,12 +74,17 @@ func switch_next() -> void:
 	_health[_index] = player.get_health()
 	_corruption[_index] = player.get_corruption()
 	_activate(next, true)
+	# Der Klang haengt am FREIWILLIGEN Wechsel, nicht in `_activate`: das laeuft auch beim Laden,
+	# beim Wiederbeleben und beim Zwangswechsel nach einem Ausfall — ein Spielstand soll nicht
+	# chirpen, und der Ausfall hat seinen eigenen Klang.
+	AudioManager.play(&"switch_figure")
 
 ## Die aktive Figur ist auf 0 HP. Sie bleibt draussen — es gibt keinen Health-Reset mehr.
 func _on_player_downed() -> void:
 	_health[_index] = 0
 	_corruption[_index] = player.get_corruption()
 	var fallen: int = _index
+	AudioManager.play(&"figure_down")
 	figure_downed.emit(fallen, figures[fallen])
 	var next: int = _next_standing(fallen)
 	if next < 0:
@@ -180,6 +186,9 @@ func _activate(index: int, reset_state: bool) -> void:
 		_health[_index] = profile.stats.max_health
 	player.set_health(_health[_index])
 	player.set_corruption(_corruption[_index])
+	# Die neue Stufe uebernehmen, ohne sie als Ereignis zu melden (Phase 10, siehe dort).
+	if player.reif != null:
+		player.reif.sync_level()
 	if reset_state:
 		# Die neue Figur uebernimmt Position und Facing, startet aber aus dem Stand: sonst erbt
 		# der Zwerg die Vollgeschwindigkeit des Kuriers und der Tempo-Unterschied waere unsichtbar.

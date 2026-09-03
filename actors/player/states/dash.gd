@@ -11,6 +11,7 @@ func enter(_msg: Dictionary = {}) -> void:
 	player.velocity = dir * player.reif.stats.dash_speed
 	_frames_left = player.reif.roll_dash_frames()
 	player.reif.begin_phase()
+	AudioManager.play(&"dash")
 	# Facing bleibt fuer die Dauer des Dashes stehen — dieselbe Invariante wie im Angriff
 	# (CLAUDE.md > Movement- und Combat-Konventionen, Punkt 3).
 	player.play_anim(&"walk")

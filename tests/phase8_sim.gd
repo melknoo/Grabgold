@@ -32,6 +32,13 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 		_fails += 1
 
 func _ready() -> void:
+	# Kein Ton (Phase 10). Ein LAUFENDES Ogg laesst Godot beim Beenden zwei Fehlerzeilen im Log
+	# stehen ("resources still in use") — Engine-Verhalten, nachgestellt ohne eine Zeile des
+	# AudioManagers und auch mit `stop()` nicht abstellbar. Diese Suite prueft keinen Ton, also
+	# soll sie die Zeilen auch nicht erben. Die Buchfuehrung des Managers laeuft trotzdem weiter,
+	# der Test verhaelt sich also identisch. MUSS vor `add_child(main)` stehen: dort betritt der
+	# Bootstrap den Startraum und der haette schon Musik angeworfen.
+	AudioManager.enabled = false
 	var main: Node = (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	add_child(main)
 	var host: Node2D = main.get_node("RoomHost")

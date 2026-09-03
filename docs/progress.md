@@ -935,8 +935,202 @@ Gedächtnis über den Prozess hinaus und macht aus dem Game Over eine Frage stat
   Welt gebunden ist). Sichtbar nur im Debug-Overlay, in einer Statistik-Anzeige müsste man es
   anhalten.
 
+## Phase 10 — Ton (abgeschlossen, 2026-09-03)
+
+Bis Phase 9 war das Spiel **vollständig stumm**. Neun Phasen Kampfgefühl ohne einen einzigen
+Klang: ein Treffer war ein Freeze-Frame plus ein Knockback, der Telegraph des Skeletts ein rotes
+Blinken, der Speicherpunkt ein Aufleuchten von 24 Frames. Alles davon setzt voraus, dass der
+Spieler genau hinschaut. Von drei Kandidaten (Hauptmenü mit Slot-Auswahl, Ton, Raum-Inhalt) fiel
+die Wahl auf den Ton, weil er als einziger direkt auf das Projektziel einzahlt — **Kampfgefühl,
+nicht Umfang**.
+
+**Was steht**
+- **`AudioManager`** (Autoload, `globals/audio_manager.gd`) — der einzige Ort, an dem Klang
+  abgespielt wird: `play(id, pitch)`, `start_loop/stop_loop`, `play_music(id, frames)`,
+  `stop_music`, `play_jingle/stop_jingle`, `set_bus_db/bus_db/has_bus`, `enabled`.
+  Signal `music_changed`. Dazu Auskunftsmethoden für Tests und das Debug-Overlay
+  (`current_music`, `music_starts`, `is_music_fading`, `music_volume`, `last_played`,
+  `last_pitch`, `play_count`, `active_sfx_count`, `pool_size`, `loop_id`, `bank`).
+- **`AudioBank`** (`resources/audio_bank.gd` + generierte `audio_bank.tres`) — 18 Effekt-IDs
+  (mehrere davon mit Varianten) und 3 Musik-IDs. Die Streams liegen als `ExtResource` darin und
+  kommen mit der Bank in einem Zug.
+- **`tools/build_audio_resources.gd`** — baut `resources/default_bus_layout.tres`
+  (Master / Music -9 dB / SFX 0 dB) **und** die Bank und setzt
+  `audio/buses/default_bus_layout` per ProjectSettings-API. Die Tabellen `SOUNDS` und `MUSIC`
+  darin sind die einzige Stelle, an der „Spielereignis → Datei im Pack" steht.
+- **18 verdrahtete Ereignisse**, davon war jedes einzelne vorher stumm: Angriffsschwung,
+  Treffer auf Gegner, Treffer auf den Spieler, Gegnertod, Telegraph, Dash, Reif-Kanal (gehalten),
+  Vorwarnung des Zwangsangriffs, neue Korruptionsstufe, Figurenwechsel, verweigerter Wechsel,
+  Ausfall einer Figur, Platte runter, Platte hoch, Türbewegung, Speichern, Menü-Navigation,
+  Menü-Bestätigung. Plus Game-Over-Jingle und Raummusik.
+- **`Hitbox.hit_sound`** als `@export` am Node — die Hitbox ist der eine Trichter für **jeden**
+  Treffer im Spiel; wer zuschlägt, sagt die Szene.
+- **`Skeleton.play_sound(id)`** — legt die Zeitdehnung des Reifs auf den Pitch.
+- **`Room.music_id`** wird benutzt: A `dungeon`, B `crypt`, C `crypt`.
+- **Debug-Overlay** zeigt Musik (samt Blende), letzten Effekt, Zahl aktiver Abspieler und den
+  gehaltenen Klang — ohne das ist eine Feel-Abnahme des Mixes nicht führbar.
+
+**Entscheidungen und ihre Gründe**
+- *Autoload, nicht Node in der Weltszene:* Musik muss den Raumwechsel überleben, um den es
+  gerade geht — dieselbe Begründung, die in Phase 8 die Blende in den `RoomManager` gelegt hat.
+  `PROCESS_MODE_ALWAYS`, damit weder Hitstop (Phase 2) noch der Game-Over-Freeze (Phase 9) den
+  Ton abreißen lassen. Er hängt an `RoomManager.room_changed` — über ein **Signal**, nie über
+  eine direkte Referenz, und nur in diese Richtung; der RoomManager kennt ihn nicht. In
+  `project.godot` steht er darum **nach** dem RoomManager.
+- *Nicht positional* (`AudioStreamPlayer`, nicht `AudioStreamPlayer2D`): die Kamera folgt dem
+  Spieler und ein Raum ist maximal der doppelte Viewport — alles Hörbare ist auf dem Bild.
+  Positionaler Ton hätte Abspieler an jeden Aktor gehängt und den Manager als einzige Stelle
+  aufgegeben.
+- *Pegel auf den Bussen, nicht an den Abspielern.* Die Abspieler-Lautstärke gehört ganz der
+  Kreuzblende der Musik. Vorgabe im generierten Layout, zur Laufzeit über `set_bus_db` — das
+  ist der Andockpunkt einer Optionen-UI, die es noch nicht gibt (dieselbe Lage wie bei den drei
+  Spielstand-Slots ohne Slot-Auswahl, Phase 9).
+- *Ein Klang pro ID pro Physik-Frame.* Zwei Gegner, die im selben Frame getroffen werden, sind
+  zwei Aufrufe von `hit_enemy`; deckungsgleich addiert klingt das nach einem Knacken statt nach
+  zwei Treffern. Pool aus 12 Abspielern, round-robin: ein abgeschnittener alter Klang ist besser
+  als ein verschluckter neuer — Rückmeldung auf die **letzte** Aktion ist das, was den Kampf
+  lesbar macht.
+- *Varianten statt eines Klangs pro Ereignis* (Angriff 3, Treffer 3, Dash 2, Gegnertod 2): ein
+  Trefferklang, der beim zehnten Schlag noch identisch klingt, wird zu Matsch.
+- *Der Reif fährt in den Pitch.* `Skeleton.play_sound` fragt
+  `HitstopManager.time_scale_for(state_machine)` — ein zeitgedehnter Gegner klingt tiefer. Das
+  ist die einzige Stelle, an der der Reif hörbar auf etwas anderes als sich selbst wirkt, und
+  genau das macht ihn im Kampf lesbar. Gefragt wird nach der StateMachine, **nicht** nach dem
+  Body: verlangsamt wird sie (Phase 5, damit die Areas des Gegners nicht flackern).
+- *Der Klang hängt am gelandeten Treffer, nicht am Aufruf:* gespielt wird nur, wenn
+  `Hurtbox.take_hit` `true` liefert. Ein Klang, den I-Frames abgeprallt haben, wäre eine Lüge.
+- *`hit_sound` als Export am Node statt als Zweig im Code:* die Hitbox ist der eine Trichter,
+  durch den Spieler→Gegner **und** Gegner→Spieler laufen. Wer zuschlägt, weiß der Trichter nicht
+  und soll er nicht wissen.
+- *Genau EIN gehaltener Klang* (der kanalisierende Reif). `start_loop` ist idempotent — sonst
+  stotterte er jeden Frame, weil der Reif seinen Kanal frame-getrieben auswertet. Aufgeräumt wird
+  er bei Input-Sperre, sonst summt er durch die Blende in den nächsten Raum (dieselbe
+  Aufräumpflicht wie bei der Zeitdehnung, Phase 8).
+- *Gleiche Musik-ID = kein Neustart.* Die wichtigste Zeile der Musikverwaltung. Die Kette ist
+  bewusst A `dungeon` ↔ B `crypt` ↔ C `crypt`: ein Stück, das an jeder Tür von vorn anfängt,
+  verrät die Raumgrenze und macht Herumlaufen unangenehm. B↔C beweist den Fall im Spielen.
+- *Kreuzblende in Frames* (`music_fade_frames = 45`, 0,75 s), zwei Abspieler, kein Tween — wie
+  Tür, Gegner-KI, Angriffstiming und beide Blenden, und aus demselben Grund. Sie blendet vom
+  **aktuellen Stand** des Ausblendenden aus, damit eine unterbrochene Blende nicht erst auf voll
+  springt.
+- *Die Ogg-Schleife setzt der Manager beim Einhängen, nicht das Bau-Tool.* Stand einmal im Tool
+  und war ein No-Op: in der `.tres` landet nur eine `ExtResource`-Referenz, das `loop`-Flag des
+  Streams liegt in der `.ogg.import` des Packs (dort `false`) und wird von `ResourceSaver` nicht
+  mitgeschrieben. Der Manager verändert damit eine geteilte Resource im Speicher — zulässig, weil
+  er ihr einziger Nutzer ist und die Zuweisung idempotent.
+- *Jingles auf eigenem Abspieler* (Musik-Bus): `play_jingle` stellt das Stück ab — beides
+  gleichzeitig ist Krach, und eine weiterlaufende Dungeonmusik hinter dem Tod liest sich wie ein
+  hängender Frame. Umgekehrt darf `stop_music` den Jingle nicht mit abräumen. `scenes/main.gd`
+  würgt ihn ab, bevor eine neue Welt aufgebaut wird.
+- *Der Klang des Figurenwechsels hängt am freiwilligen Wechsel, nicht in `_activate`:* das läuft
+  auch beim Laden, beim Wiederbeleben und beim Zwangswechsel nach einem Ausfall. Ein Spielstand
+  soll nicht chirpen, und der Ausfall hat seinen eigenen Klang.
+- *Eine neue Korruptionsstufe klingt, der Abbau nicht.* Steigen ist ein Ereignis, die 0,4/s
+  Abbau sind ein Nachlassen über Minuten. Dazu `Reif.sync_level()`, das `PartyManager._activate`
+  ruft: ohne den Abgleich chirpte jeder Wechsel auf eine schon korrumpierte Figur, obwohl sie
+  nichts erreicht hat.
+- *Am Rand der Menüliste bleibt es still.* Ein Klick, auf den nichts folgt, liest sich als Bug —
+  dieselbe Überlegung, die in Phase 9 den leeren Slot grau **und nicht anwählbar** gemacht hat.
+- *Kein Tuerklang im Pack.* `door_move` ist ein schwerer Aufprall, beim Schließen derselbe Klang
+  mit Pitch 0,8 (`Door.CLOSE_PITCH`) — dieselbe Tür, andere Richtung. Behelf, eingetragen in
+  `docs/assets-todo.md`.
+
+**Regel Null (gegen die echte ClassDB geprüft, nicht geraten)**
+- `AudioServer.add_bus(at_position = -1) -> void`, `set_bus_name(idx, name) -> void`,
+  `set_bus_send(idx, send: StringName) -> void`, `set_bus_volume_db(idx, db) -> void`,
+  `get_bus_volume_db(idx) -> float`, `get_bus_index(name: StringName) -> int`,
+  `remove_bus(idx) -> void`, `generate_bus_layout() -> AudioBusLayout`, `.bus_count: int`
+- `AudioBusLayout` hat **keine** skriptbaren Properties — die Klasse ist in der Doku leer, alles
+  läuft über interne `bus/N/...`-Keys. Genau deshalb ist sie nicht von Hand schreibbar.
+- `AudioStreamPlayer`: `.stream`, `.bus: StringName`, `.pitch_scale`, `.volume_db`,
+  `.volume_linear`, `.playing`, `play(from_position = 0.0)`, `stop()`, Signal `finished`
+- `AudioStreamOggVorbis.loop: bool` (Setter `set_loop`, Getter `has_loop`, Default `false`)
+- `ResourceSaver.save(resource, path = "", flags) -> int`
+- `db_to_linear` / `linear_to_db` als `@GlobalScope`-Funktionen
+- ProjectSetting heißt `audio/buses/default_bus_layout`
+
+**Gefunden und geklärt: die zwei Zeilen beim Beenden**
+- Symptom: seit dieser Phase endete jeder Lauf mit `WARNING: ObjectDB instances leaked at exit`
+  und `ERROR: 2 resources still in use at exit`; `--verbose` nennt `AudioStreamOggVorbis`,
+  `OggPacketSequence` und die zugehörigen Playbacks.
+- Nachgestellt in einem **eigenen Projekt aus zwölf Zeilen** ohne eine Zeile des AudioManagers:
+  tritt genauso auf. In **beiden** Audio-Treibern (Fenster wie headless). Auch mit `stop()` +
+  `stream = null` im `_exit_tree` nicht abstellbar — der zuerst gebaute Aufräum-Handler war ein
+  No-Op und flog wieder raus, statt als Kommentar stehenzubleiben, der etwas behauptet.
+- Bedingung ist ein **laufendes** Ogg beim Prozessende; ein geladenes, nicht abgespieltes ist
+  sauber. Also Engine-Verhalten, kein Leck im laufenden Spiel — und der Grund für den
+  Stummschalter.
+- `AudioManager.enabled` schaltet stumm und lässt die **Buchführung** laufen (`current_music`,
+  `music_starts`, `play_count`, Dedup, Pitch). Zwei Gründe, und nur einer sind die Tests: die
+  Suiten phase4..9 prüfen keinen Ton und sollen die Zeilen nicht erben — und es ist der Anfang
+  der Stummschaltung, die ein Optionsmenü braucht.
+
+**Verifikation (headless, `tests/phase10_sim.*`, 120/120 grün)**
+- **Busse und Bank:** Master/Music/SFX vorhanden, Musik liegt unter den Effekten (-9 / 0 dB);
+  jede der 18 Effekt-IDs und aller 3 Musik-IDs, die im Spiel angeworfen werden, ist in der Bank;
+  Angriff und Treffer haben ≥ 2 Varianten, und über 40 Ziehungen kommen auch mehrere vor
+  (Variation im Ohr, nicht nur in der Bank); unbekannte ID liefert `null`.
+- **Abspiel-Mechanik, mit echtem Ton (nur WAV):** `play()` meldet Erfolg, Zähler und
+  `last_played` stimmen, ein Abspieler läuft **wirklich**; zweiter Aufruf derselben ID im
+  gleichen Frame wird verworfen, nächsten Frame wieder erlaubt; unbekannte ID meldet Fehlschlag;
+  40 Klänge über 40 Frames legen **keinen** Node nach; `start_loop` ist idempotent, `stop_loop`
+  räumt auf; `enabled = false` schaltet alle Abspieler ab.
+- **Musik:** Kreuzblende ist auf halber Strecke halb laut (0,50) und danach voll (1,00);
+  **gleiche ID startet nicht neu** und löst auch keine Blende aus; andere ID blendet über;
+  `stop_music(0)` ist ein harter Schnitt; leere und unbekannte IDs verhalten sich definiert;
+  `music_changed` meldet `dungeon`, `crypt`, `""`.
+- **Die Raumkette trägt die Musik:** Startraum bringt `dungeon` mit; A→B wechselt auf `crypt`;
+  **B→C lässt dasselbe Stück laufen und startet es nicht neu** (Startzähler bleibt stehen), C→B
+  ebenso; B→A blendet zurück und wirft `dungeon` neu an.
+- **Der Kampf ist hörbar:** die Klang-IDs sitzen an den Hitboxen der jeweiligen Szene; ein
+  **echter Überlapp** (nicht `hurtbox.take_hit` wie in den anderen Suiten — das umginge genau
+  die Stelle, um die es geht) klingt in beide Richtungen; ein an I-Frames **abgeprallter**
+  Treffer bleibt stumm; Telegraph und Gegnertod klingen; ein zeitgedehnter Gegner klingt mit
+  Pitch 0,55, ein ungedehnter mit 1,00.
+- **Der Reif ist hörbar:** Kanal summt, Dash zischt, Loslassen beendet den gehaltenen Klang, und
+  die Input-Sperre schaltet ihn ab (er summt nicht in den nächsten Raum); die Vorwarnung des
+  Zwangsangriffs warnt hörbar; eine neu erreichte Korruptionsstufe klingt, eine sinkende nicht.
+- **Ensemble, Raum, Speichern:** freiwilliger Wechsel klingt; ein Wechsel auf eine schon
+  korrumpierte Figur klingt **nicht** nach neuer Stufe; der ab Stufe 4 verweigerte Wechsel
+  klingt; Platte runter und hoch; Tür auf und zu, das Zuschlagen mit Pitch 0,80; Speichern
+  bestätigt sich hörbar.
+- **Ausfall, Game Over, Menü:** eine ausgefallene Figur klingt; Game Over stellt die Musik ab;
+  Menü-Navigation klickt, **am Rand der Liste bleibt es still**, Bestätigen klickt; nach dem
+  Laden trägt der Raum wieder sein Stück und der Jingle läuft nicht darunter weiter.
+- **Der Test räumt auf** (eigenes Verzeichnis `user://saves_phase10`, am Ende leer) und hat eine
+  **Notbremse** (`FRAME_BUDGET = 6000`), aus demselben Grund wie phase9_sim.
+- **Regression:** phase4 (27), phase5 (57), phase6 (28), phase7 (37), phase8 (84), phase9 (135)
+  alle weiterhin „ALLES GRUEN" — zusammen mit phase10 (120) **488 Checks**, 0 Fehler, kein
+  Ogg-Rauschen beim Beenden in irgendeiner Suite.
+- **Fensterlauf** mit echtem Ton fehlerlos.
+
+**Offen / bekannte Punkte**
+- **Feel-Abnahme steht aus, und diesmal ist sie der eigentliche Punkt.** Die 18 Zuordnungen sind
+  nach Ordnernamen gewählt, **nicht nach Gehör** — belegt ist nur, dass jede Datei existiert und
+  am richtigen Ereignis hängt. Ob `Voice/Voice9.wav` wie eine fallende Figur klingt, ob der
+  Reif-Loop nervt, ob -9 dB für die Musik stimmt: das entscheidet Hören. Ändern heißt eine Zeile
+  in der Tabelle `SOUNDS` und ein Tool-Lauf — kein Code.
+- **Der Reif-Loop hat eine Naht.** Er wird über `finished` neu angeworfen, weil das `loop_mode`
+  in der `.import` des Packs liegt. Bei einem kurzen Summen sollte das nicht auffallen; fällt es
+  auf, ist die Lösung die `.import` des Packs, nicht der Manager.
+- **Keine Lautstärke-UI.** `set_bus_db` steht, aber im Spiel erreicht man es nicht — dieselbe
+  Lage wie bei den drei Spielstand-Slots ohne Slot-Auswahl. Ein Optionsmenü hätte außerdem eine
+  Persistenz nötig, die es noch nicht gibt: ein Spielstand ist der falsche Ort für eine
+  Einstellung.
+- **Nur ein gehaltener Klang.** Der Flüster-Layer für Korruptionsstufe 1 (offen seit Phase 5) ist
+  damit **nicht** mehr durch fehlende Infrastruktur blockiert, braucht aber einen zweiten
+  Loop-Platz, dessen Lautstärke an `Player.get_corruption()` hängt — und eine Entscheidung, die
+  man hören muss.
+- **Kein Kampfstück, keine Ambience, keine Schritte** — bewusst, siehe `docs/assets-todo.md`.
+  Ein Kampfwechsel bräuchte einen Aggro-Zustand über alle Gegner eines Raums, den es nicht gibt.
+- **Klang für den Raumwechsel selbst** fehlt (Tür auf/zu beim Betreten) — die `RoomExit` ist
+  stumm, weil sie im ALTTP-Stil beim Reinlaufen auslöst und ein Klang dort schnell zur
+  Belästigung wird. Gehört in die Abnahme.
+- **Die zwei Engine-Zeilen beim Beenden** bleiben im normalen Spiellauf stehen (siehe oben). Sie
+  sind erklärt und harmlos, aber sie stehen da.
+
 ## Nächste Phase
-- **Phase 10** — noch nicht festgelegt. Naheliegende Kandidaten aus dem bisher Offenen: ein
-  echtes Hauptmenü mit Slot-Auswahl (baut direkt auf Phase 9 auf), Audio-Infrastruktur
-  (`room_changed` hat seit Phase 8 einen Andockpunkt, `Room.music_id` liegt ungenutzt bereit)
-  oder Raum-Inhalt statt Testgerüst. Erst nach Go des Users.
+- **Phase 11** — noch nicht festgelegt. Die Kandidaten von Phase 10 stehen weiter offen:
+  Hauptmenü mit Slot-Auswahl (plus Optionen, für die es seit dieser Phase einen Grund gibt) oder
+  Raum-Inhalt statt Testgerüst. Neu dazu: eine **Feel-Abnahme des Mixes**, die keine eigene Phase
+  sein muss, aber vor jedem weiteren Ton-Ausbau stattfinden sollte. Erst nach Go des Users.

@@ -91,6 +91,15 @@ func enable_hitbox() -> void:
 func disable_hitbox() -> void:
 	hitbox.disable()
 
+## Klang DIESES Gegners (Phase 10). Die Zeitdehnung des Reifs (Phase 5) faehrt in den PITCH:
+## ein verlangsamter Gegner klingt tiefer. Das ist die einzige Stelle, an der der Reif hoerbar
+## auf etwas anderes als sich selbst wirkt — und genau das macht ihn im Kampf lesbar.
+##
+## Gefragt wird nach der StateMachine, nicht nach dem Body: verlangsamt wird sie (der Body laeuft
+## durch, damit seine Areas nicht flackern — siehe `Reif._apply_time_dilation`).
+func play_sound(id: StringName) -> void:
+	AudioManager.play(id, HitstopManager.time_scale_for(state_machine))
+
 func get_health() -> int:
 	return _health
 

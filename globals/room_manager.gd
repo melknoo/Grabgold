@@ -11,8 +11,9 @@ extends Node
 ## die haengen `main.tscn` als Kind unter sich (Muster seit phase4_sim).
 
 ## Der Raum steht, der Spieler ist gesetzt, die Kamera ausgerichtet — noch waehrend der Blende.
-## Andockpunkt fuer Phase 11 (AudioManager liest `Room.music_id`): Autoloads koordinieren sich
-## ueber Signale, nicht ueber direkte Referenzen aufeinander.
+## Andockpunkt des `AudioManager` (Phase 10, liest `Room.music_id`): Autoloads koordinieren sich
+## ueber Signale, nicht ueber direkte Referenzen aufeinander. Der RoomManager kennt den
+## AudioManager darum nicht — die Abhaengigkeit laeuft nur in die andere Richtung.
 signal room_changed(room_id: StringName)
 ## Blende ist wieder offen und der Input frei.
 signal transition_finished

@@ -67,5 +67,8 @@ func _try_use(player: Player) -> bool:
 		return false
 	_flash_left = maxi(flash_frames, 1)
 	_sprite.modulate = COLOR_FLASH
+	# Schliesst einen offenen Punkt aus Phase 9: die Rueckmeldung war ein Aufleuchten von 24
+	# Frames und sonst nichts. Ein Speichervorgang, den man nicht bemerkt, wird nicht benutzt.
+	AudioManager.play(&"save_point")
 	used.emit()
 	return true

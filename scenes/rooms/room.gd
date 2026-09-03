@@ -17,9 +17,12 @@ const TILE := 16
 ## aendert, aendert es auch hier — die Kamera-Limits haengen daran.
 @export var size_tiles: Vector2i = Vector2i(40, 24)
 
-## Musikstueck des Raums. In Phase 8 ungenutzt und bewusst schon angelegt: Phase 11 liest es im
-## `room_changed`-Handler des AudioManagers. Der Track gehoert zum Raum, nicht in die Registry —
-## sonst muesste man ihn an zwei Stellen pflegen.
+## Musikstueck des Raums. In Phase 8 angelegt und dort noch ungenutzt; seit Phase 10 liest es der
+## `AudioManager` in seinem `room_changed`-Handler. Der Track gehoert zum Raum, nicht in die
+## Registry — sonst muesste man ihn an zwei Stellen pflegen. Leer = der Raum ist still.
+##
+## GLEICHE ID im Nachbarraum = das Stueck laeuft weiter, ohne Neustart (siehe
+## `AudioManager.play_music`). Die Kette 01 dungeon / 02 crypt / 03 crypt nutzt beides aus.
 @export var music_id: StringName = &""
 
 func _ready() -> void:

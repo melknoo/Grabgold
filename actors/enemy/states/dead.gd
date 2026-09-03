@@ -10,6 +10,7 @@ func enter(_msg: Dictionary = {}) -> void:
 	# lief hier jedes Mal ein "There is no animation with name 'dead_down'" ins Log und die
 	# Todespose war nie zu sehen — aufgedeckt vom Gegner-Respawn-Check in phase8_sim.
 	enemy.sprite.play(&"dead")
+	enemy.play_sound(&"enemy_dead")
 	enemy.hitbox.disable()
 	# set_deferred: dieser State wird aus `hurtbox.hit_taken` betreten, also mitten im
 	# Area-in/out-Signal. Godot verweigert dort das direkte Setzen von `monitorable`

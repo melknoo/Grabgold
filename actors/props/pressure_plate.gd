@@ -42,6 +42,8 @@ func _physics_process(_delta: float) -> void:
 	_pressed = pressed_now
 	_sprite.region_rect = REGION_DOWN if _pressed else REGION_UP
 	if _pressed:
+		AudioManager.play(&"plate_press")
 		triggered.emit()
 	else:
+		AudioManager.play(&"plate_release")
 		released.emit()
