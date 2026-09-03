@@ -1,59 +1,62 @@
 [gd_resource type="Resource" script_class="AudioBank" format=3]
 
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Musics/21 - Dungeon.ogg" id="1_uxjrb"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Musics/40 - Crypt.ogg" id="2_vq8sx"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Jingles/GameOver.wav" id="3_o6txr"]
-[ext_resource type="Script" path="res://resources/audio_bank.gd" id="4_ncek7"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Slash.wav" id="5_1w5vl"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Slash2.wav" id="6_1ty0t"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Slash3.wav" id="7_53wa5"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit1.wav" id="8_uowwc"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit2.wav" id="9_svrxj"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit3.wav" id="10_2inf6"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact.wav" id="11_wcwb2"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact2.wav" id="12_c7g6g"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact4.wav" id="13_74jb1"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact5.wav" id="14_se4ti"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Alert/Alert.wav" id="15_h322m"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Whoosh.wav" id="16_cs10s"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Whoosh2.wav" id="17_0xdbk"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Spirit.wav" id="18_7k6cb"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Strange.wav" id="19_kybdq"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Magic4.wav" id="20_gd7xr"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Fx.wav" id="21_jgdon"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Menu/Cancel.wav" id="22_rkrbn"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Voice/Voice9.wav" id="23_f8707"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit7.wav" id="24_ya16h"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit6.wav" id="25_kusay"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact3.wav" id="26_p3w7n"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Jingles/Success1.wav" id="27_pd6uu"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Menu/Move1.wav" id="28_e0lxt"]
-[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Menu/Accept.wav" id="29_3uim4"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Musics/21 - Dungeon.ogg" id="1_vq8sx"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Musics/40 - Crypt.ogg" id="2_o6txr"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Jingles/GameOver.wav" id="3_ncek7"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Musics/1 - Adventure Begin.ogg" id="4_1w5vl"]
+[ext_resource type="Script" path="res://resources/audio_bank.gd" id="5_1ty0t"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Slash.wav" id="6_53wa5"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Slash2.wav" id="7_uowwc"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Slash3.wav" id="8_svrxj"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit1.wav" id="9_2inf6"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit2.wav" id="10_wcwb2"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit3.wav" id="11_c7g6g"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact.wav" id="12_74jb1"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact2.wav" id="13_se4ti"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact4.wav" id="14_h322m"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact5.wav" id="15_cs10s"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Alert/Alert.wav" id="16_0xdbk"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Whoosh.wav" id="17_7k6cb"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Whoosh & Slash/Whoosh2.wav" id="18_kybdq"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Spirit.wav" id="19_gd7xr"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Strange.wav" id="20_jgdon"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Magic4.wav" id="21_rkrbn"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Magic & Skill/Fx.wav" id="22_f8707"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Menu/Cancel.wav" id="23_ya16h"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Voice/Voice9.wav" id="24_kusay"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit7.wav" id="25_p3w7n"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Hit6.wav" id="26_pd6uu"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Hit & Impact/Impact3.wav" id="27_e0lxt"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Jingles/Success1.wav" id="28_3uim4"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Menu/Move1.wav" id="29_ae2o7"]
+[ext_resource type="AudioStream" path="res://assets/external/Ninja Adventure - Asset Pack/Audio/Sounds/Menu/Accept.wav" id="30_mwnq1"]
 
 [resource]
-script = ExtResource("4_ncek7")
+script = ExtResource("5_1ty0t")
 sounds = Dictionary[StringName, Array]({
-&"attack_swing": [ExtResource("5_1w5vl"), ExtResource("6_1ty0t"), ExtResource("7_53wa5")],
-&"corruption_up": [ExtResource("20_gd7xr")],
-&"dash": [ExtResource("16_cs10s"), ExtResource("17_0xdbk")],
-&"door_move": [ExtResource("26_p3w7n")],
-&"enemy_alert": [ExtResource("15_h322m")],
-&"enemy_dead": [ExtResource("13_74jb1"), ExtResource("14_se4ti")],
-&"figure_down": [ExtResource("23_f8707")],
-&"hit_enemy": [ExtResource("8_uowwc"), ExtResource("9_svrxj"), ExtResource("10_2inf6")],
-&"hit_player": [ExtResource("11_wcwb2"), ExtResource("12_c7g6g")],
-&"menu_confirm": [ExtResource("29_3uim4")],
-&"menu_move": [ExtResource("28_e0lxt")],
-&"plate_press": [ExtResource("24_ya16h")],
-&"plate_release": [ExtResource("25_kusay")],
-&"reif_compel": [ExtResource("19_kybdq")],
-&"reif_loop": [ExtResource("18_7k6cb")],
-&"save_point": [ExtResource("27_pd6uu")],
-&"switch_figure": [ExtResource("21_jgdon")],
-&"switch_refused": [ExtResource("22_rkrbn")]
+&"attack_swing": [ExtResource("6_53wa5"), ExtResource("7_uowwc"), ExtResource("8_svrxj")],
+&"corruption_up": [ExtResource("21_rkrbn")],
+&"dash": [ExtResource("17_7k6cb"), ExtResource("18_kybdq")],
+&"door_move": [ExtResource("27_e0lxt")],
+&"enemy_alert": [ExtResource("16_0xdbk")],
+&"enemy_dead": [ExtResource("14_h322m"), ExtResource("15_cs10s")],
+&"figure_down": [ExtResource("24_kusay")],
+&"hit_enemy": [ExtResource("9_2inf6"), ExtResource("10_wcwb2"), ExtResource("11_c7g6g")],
+&"hit_player": [ExtResource("12_74jb1"), ExtResource("13_se4ti")],
+&"menu_back": [ExtResource("23_ya16h")],
+&"menu_confirm": [ExtResource("30_mwnq1")],
+&"menu_move": [ExtResource("29_ae2o7")],
+&"plate_press": [ExtResource("25_p3w7n")],
+&"plate_release": [ExtResource("26_pd6uu")],
+&"reif_compel": [ExtResource("20_jgdon")],
+&"reif_loop": [ExtResource("19_gd7xr")],
+&"save_point": [ExtResource("28_3uim4")],
+&"switch_figure": [ExtResource("22_f8707")],
+&"switch_refused": [ExtResource("23_ya16h")]
 })
 music = Dictionary[StringName, AudioStream]({
-&"crypt": ExtResource("2_vq8sx"),
-&"dungeon": ExtResource("1_uxjrb"),
-&"game_over": ExtResource("3_o6txr")
+&"crypt": ExtResource("2_o6txr"),
+&"dungeon": ExtResource("1_vq8sx"),
+&"game_over": ExtResource("3_ncek7"),
+&"title": ExtResource("4_1w5vl")
 })

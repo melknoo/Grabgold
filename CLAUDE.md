@@ -78,8 +78,12 @@ Projekt. Bei Signatur-Zweifeln gilt trotzdem Regel Null gegen die **lokal** gedu
   Layout (steuern mit WASD, austeilen mit der Maus): `move_up/down/left/right` (WASD + Pfeile),
   `attack` (**Linksklick** + E + J), `dash` (**Leertaste** + Shift + Gamepad A — wirkt nur bei
   gehaltenem Reif), `reif_channel` (**Rechtsklick** + L + rechter Trigger, **halten**),
-  `switch_figure` (Q + Schultertasten), `interact` (**F** + Enter + Gamepad Y),
+  `switch_figure` (Q + Schultertasten; im Hauptmenue **loescht** Q einen Slot),
+  `interact` (**F** + Enter + Gamepad Y; bestaetigt auch in jedem Menue),
+  `pause` (**Escape** + Gamepad Start; oeffnet die Pause und ist in jedem Menue „zurueck"),
   `debug_toggle` (F1).
+  **Menues bekommen keine eigenen Actions** — sie lesen `move_*`, `interact`/`attack` und
+  `pause`. Der Spieler soll im Menue dieselben Tasten druecken wie im Spiel.
   Regel fuer neue Bindings: alles, was im Kampf gedrueckt oder *gehalten* wird, muss die linke Hand
   auf WASD oder die rechte auf der Maus erreichen.
 
@@ -128,7 +132,7 @@ für diesen Test kurz selbst setzen, weil `test_move` gegen die *aktuelle* Maske
 assets/{external/<packname>/,  placeholder/}   external = manuell abgelegte Packs, nie herunterladen
 docs/{progress,credits,assets-todo}.md
 globals/            Autoloads (hitstop_manager.gd, debug.gd, room_manager.gd, save_manager.gd,
-                    audio_manager.gd)
+                    audio_manager.gd, settings_manager.gd)
 resources/          tuning_stats.gd + figure_profile.gd + room_registry.gd + save_data.gd
                     + audio_bank.gd (class_names) + *.tres
                     + default_bus_layout.tres (generiert, Phase 10)
@@ -138,12 +142,16 @@ actors/enemy/       enemy.tscn/.gd + states/{idle,approach,telegraph,attack,retr
 actors/props/       door.tscn/.gd + pressure_plate.tscn/.gd (Raum-Interaktion, Phase 6)
                     room_exit.tscn/.gd (Raum-Tuer, Phase 8)
                     save_point.tscn/.gd (Speicherpunkt, Phase 9)
+ui/main_menu/       Dateiauswahl + Optionen + Beenden (Phase 11, liegt in der Huelle)
+ui/options_menu/    Lautstaerkeregler je Bus (Phase 11)
+ui/pause_menu/      Weiter / Optionen / Hauptmenue (Phase 11)
 ui/debug_overlay/   debug_overlay.tscn/.gd
 ui/corruption_overlay/  Vignette fuer Korruptionsstufe 1 (.tscn/.gd/.gdshader)
 ui/game_over/       Schwarzblende beim Game Over (Phase 7)
 ui/game_over_menu/  Auswahl nach der Blende: Speicherstand / Neu beginnen (Phase 9)
 ui/transition_fade/ Blende des Raumwechsels (Phase 8, vom RoomManager instanziert)
-scenes/             main.tscn (persistente Weltszene) + rooms/
+scenes/             boot.tscn (HUELLE, run/main_scene ab Phase 11)
+                    main.tscn (persistente Weltszene, `class_name World`) + rooms/
 scenes/rooms/       room.gd (Basis) + spawn_point.gd + room_0{1,2,3}.tscn
                     + room_0{1,2,3}_tiles.tscn (generiert)
 tools/              Godot-Tool-Skripte, die Resources/Settings generieren (nie von Hand editieren)
@@ -394,9 +402,9 @@ des Raums. Der Raum selbst ist das einzige Kind von **`RoomHost`** und wird geta
   fällt seit Phase 8 von selbst so aus). Gesetzt = der Tod landet als `kill:<id>` in den
   `world_flags`, und der Gegner baut sich beim Betreten gar nicht erst auf. Die ID ist der
   **Flag-Name** und muss über alle Räume eindeutig sein.
-- **Ein Hauptmenü gibt es bewusst nicht:** es wäre eine eigene Szene **vor** der persistenten
-  Weltszene und damit ein eigener Umbau. Die drei Slots sind angelegt und adressierbar
-  (`SaveManager.active_slot`), eine Slot-Auswahl-UI fehlt.
+- **Die Slot-Auswahl kam in Phase 11** (Hauptmenü, siehe unten). Bis dahin waren die drei Slots
+  angelegt und adressierbar (`SaveManager.active_slot`), aber der Spieler konnte nicht sehen und
+  nicht wählen, in welchen ein Speicherpunkt schreibt.
 
 ## Ton (Phase 10)
 
@@ -416,7 +424,8 @@ Bis Phase 9 war das Spiel **vollständig stumm**. `globals/audio_manager.gd` (Au
   einzige Stelle.
 - **Pegel liegen auf den BUSSEN** (Master / Music -9 dB / SFX 0 dB, im generierten Layout), die
   Abspieler-Lautstärke gehört ganz der Kreuzblende der Musik. Zur Laufzeit über
-  `AudioManager.set_bus_db` — eine Optionen-UI gibt es noch nicht.
+  `AudioManager.set_bus_db`; seit Phase 11 schreibt dort das Optionsmenü hinein — **relativ** zu
+  diesen Vorgaben, nicht absolut.
 - **Ein Klang pro ID pro Physik-Frame.** Zwei Gegner, die im selben Frame getroffen werden, sind
   zwei Aufrufe von `hit_enemy`; deckungsgleich addiert klingt das nach einem Knacken statt nach
   zwei Treffern. Pool aus 12 Abspielern, round-robin — ein abgeschnittener alter Klang ist besser
@@ -455,6 +464,88 @@ Audio-Treibern (Fenster wie headless), und auch mit `stop()` + `stream = null` k
 nicht abstellbar. Ein **geladenes, nicht abgespieltes** Ogg ist dagegen sauber. Kein Leck im
 laufenden Spiel — aber der Grund, warum die Testsuiten stumm laufen.
 
+## Hülle: Hauptmenü, Optionen, Pause (Phase 11)
+
+Bis Phase 10 war `scenes/main.tscn` die Startszene und baute sich in `_ready` selbst den
+Startraum — es gab **nie** einen Zustand „Spiel läuft nicht". Phase 9 hatte das Hauptmenü genau
+deshalb verschoben („eine eigene Szene **vor** der persistenten Weltszene und damit ein eigener
+Umbau"). `scenes/boot.tscn` **ist** dieser Umbau und ist seither `run/main_scene`.
+
+Die Schichtung ist drei tief, und jede Schicht wird von der darüber weggeworfen:
+
+```
+Boot (nie gewechselt)   Menues, Optionen, Pause — die Huelle
+  +- WorldHost
+       +- main.tscn     persistente Weltszene: Player, PartyManager, Overlays
+            +- RoomHost
+                 +- room_0N.tscn   vom RoomManager getauscht (Phase 8)
+```
+
+- **Die Menüs liegen in der Hülle, nicht in der Welt.** Das Hauptmenü muss ohne Welt existieren,
+  und Options- und Pausenbildschirm teilen sich einen Bildschirm mit ihm. Das **Game-Over-Menü
+  bleibt in der Weltszene** — es gehört zum Sterben, nicht zur Hülle; es reicht seinen dritten
+  Eintrag als Signal `World.main_menu_requested` nach oben, weil eine Szene sich nicht selbst
+  wegwerfen kann.
+- **`World.enter_on_ready`** (Default `true`) entscheidet, ob die Weltszene beim Aufbau selbst
+  den Startraum betritt. Die Hülle setzt es **vor** `add_child` auf `false` und entscheidet dann
+  zwischen Startraum und Spielstand. Der Default bleibt `true`, damit die sechs Suiten davor
+  `main.tscn` weiter als Kind unter sich hängen können — genau das Muster von `restart_on_wipe`.
+- **Zurück ins Hauptmenü heißt: die Welt wird weggeworfen**, nicht angehalten. Ein Spiel, das
+  hinter dem Menü weiterlebte, wäre ein zweiter Weltzustand neben dem Spielstand, und die Frage
+  „welcher gilt" hat keine gute Antwort. Freigegeben wird mit `remove_child` **plus** `queue_free`
+  (Muster aus `RoomManager._swap_room`), und `RoomManager.clear_fade()` räumt die Blende auf —
+  sie lebt im Autoload und überlebt jede Welt.
+- **Es liest kein Menü in demselben Frame denselben Tastendruck.** Wer einen anderen Bildschirm
+  aufmacht, blendet seinen eigenen aus, und jeder Bildschirm hat nach `open()` **einen Frame
+  Schonzeit** (`_grace`). Ohne die schlüge der `pause`-Druck, der die Optionen aufmacht, im
+  Pausenmenü gleich noch einmal zu.
+
+**Hauptmenü = Dateiauswahl** (ALTTP-Muster), nicht „Neues Spiel / Laden / Optionen": die drei
+Slots stehen als Zeilen da, ein voller lädt, ein **leerer beginnt dort** ein neues Spiel. Damit
+ist der Slot immer bewusst gewählt — bis Phase 10 schrieb jeder Speicherpunkt in
+`SaveManager.active_slot`, und welcher das war, konnte der Spieler nirgends sehen.
+
+- **Löschen liegt hier und nirgends sonst**, mit Inline-Bestätigung auf der Zeile selbst (Q lädt
+  scharf, F löscht, Q bricht ab, Wegbewegen entschärft). Ohne es wäre die Auswahl ein
+  Sackgassen-Menü: nach drei Spielständen ließe sich kein neues Spiel mehr beginnen, weil ein
+  voller Slot immer lädt.
+- Ein leerer Slot ist hier **anwählbar** und darum nicht grau — anders als im Game-Over-Menü, wo
+  derselbe leere Slot nichts zu laden hat.
+
+**Pause** friert mit den Mitteln aus Phase 9: `RoomManager.set_room_frozen` (`process_mode` am
+`RoomHost`) plus `Player.set_input_locked` — über `World.set_paused`. Ausdrücklich **nicht**
+`get_tree().paused` und nicht `Engine.time_scale`, dasselbe Argument wie beim HitstopManager.
+
+- **Die Musik läuft in der Pause weiter** — sonst wäre der Musikregler nicht zu hören, während
+  man ihn zieht. Der Reif räumt seinen gehaltenen Klang bei der Input-Sperre selbst auf (Phase 10),
+  ein Summen durch die Pause gibt es also von selbst nicht.
+- **Die Taste wird in der Hülle gelesen**, nicht in der Welt: nur die Hülle weiß, ob gerade ein
+  anderer Bildschirm offen ist. Sie geht nicht auf während einer Blende
+  (`RoomManager.is_transitioning`) und nicht im Game Over (`World.accepts_pause`) — dort hält die
+  Welt schon und ein zweiter Bildschirm hörte auf dieselben Tasten.
+
+**Einstellungen: `globals/settings_manager.gd` (Autoload `Settings`), `user://settings.cfg`.**
+Vierter Besitzer neben RoomManager (Raum), SaveManager (Fortschritt) und AudioManager (Ton).
+
+- **Nicht im Spielstand.** Eine Lautstärke gehört dem Gerät, nicht dem Durchlauf — wer Slot 2
+  lädt, will nicht die Pegel von Slot 1. Der Autoload steht in `project.godot` **nach**
+  `AudioManager`, weil er dessen `set_bus_db` benutzt.
+- **`ConfigFile`, nicht JSON wie `SaveData`** (Phase 9): es ist die Einrichtung der Engine, von
+  Hand lesbar, und `get_value(section, key, default)` trägt ein später dazukommendes Feld von
+  selbst. Eine Versionsnummer braucht sie nicht — eine unbekannte Datei kostet hier höchstens
+  eine Lautstärke, während ein halb angewandter Spielstand ein kaputtes Spiel wäre.
+- **Übernommen wird Schlüssel für Schlüssel**, und nur was da ist und eine Zahl ist. Ein
+  fehlender Schlüssel lässt den laufenden Wert stehen, statt ihn auf die Vorgabe zurückzusetzen.
+  `ConfigFile` ist nachsichtig — Zeilen, die es nicht versteht, überliest es und meldet trotzdem
+  `OK`; der Rückgabewert kann also nicht die Prüfung sein.
+- **Der Pegel ist eine STUFE 0..10, nicht dB** — das ist, was die UI zeigt und der Spieler
+  einstellt. Und er ist **relativ zur Vorgabe** aus `default_bus_layout.tres`: Stufe 10 heißt
+  „wie der Autor es gemischt hat" (Musik −9 dB), nicht „0 dB". Sonst hätte der erste Griff an den
+  Regler die Mischung aus Phase 10 eingerissen. Stufe 0 ist `SILENT_DB` (−80), weil
+  `linear_to_db(0.0)` −inf wäre.
+- Die Regler zeigen **Prozentzahlen, keinen Balken**: der Standardfont ist nicht monospaced.
+  Siehe `docs/assets-todo.md`.
+
 ## Tests
 
 - `$GODOT --headless --path . res://tests/phase4_sim.tscn` — Figurenwechsel (27 Checks).
@@ -470,10 +561,19 @@ laufenden Spiel — aber der Grund, warum die Testsuiten stumm laufen.
 - `$GODOT --headless --path . res://tests/phase10_sim.tscn` — Busse, Bank, Dedup, Pool, Pitch,
   gehaltener Klang, Kreuzblende, „gleiche ID startet nicht neu", und dass jedes bisher stumme
   Ereignis einen Klang anwirft (120 Checks).
+- `$GODOT --headless --path . res://tests/phase11_sim.tscn` — Einstellungen (Stufen, dB relativ
+  zum Mix, Datei, kaputte Datei), Hauptmenue ohne Welt, neues Spiel in einem gewaehlten Slot,
+  Laden, Loeschen mit Bestaetigung, Optionen aus beiden Aufrufern, Pause (Raum steht wirklich),
+  wann die Pause **nicht** aufgeht, der dritte Game-Over-Eintrag, Menue-Klaenge (146 Checks).
 
-Alle sieben müssen „ALLES GRUEN" melden (**488 Checks**).
+Alle acht müssen „ALLES GRUEN" melden (**634 Checks**).
 
-**Tests laufen stumm.** `phase4..9_sim` setzen `AudioManager.enabled = false` **vor**
+**`phase11_sim` haengt `boot.tscn` unter sich**, nicht `main.tscn` wie die sechs Suiten davor —
+genau darum geht es in der Phase. Es setzt zusaetzlich `Settings.path` auf eine eigene `.cfg`
+(gleicher Grund wie `save_dir`) und beginnt mit `Settings.reset()`: der Autoload hat die **echte**
+Datei beim Hochkommen schon gelesen und angewandt.
+
+**Tests laufen stumm.** `phase4..9_sim` und `phase11_sim` setzen `AudioManager.enabled = false` **vor**
 `add_child(main)` — dort betritt der Bootstrap den Startraum und würfe schon Musik an. Grund ist
 die Godot-Eigenheit oben: eine laufende Ogg-Wiedergabe hinterlässt beim Beenden zwei Fehlerzeilen,
 und sechs Suiten, die keinen Ton prüfen, sollen die nicht erben. Die Buchführung des Managers
@@ -481,8 +581,8 @@ läuft stumm unverändert weiter, die Suiten verhalten sich also identisch. `pha
 für **einen** Abschnitt echten Ton ein — dort ausschließlich **WAV**-Effekte, nie ein Ogg.
 
 **Tests fassen `user://saves` nicht an:** `SaveManager.save_dir` ist zur Laufzeit setzbar, und
-phase8/9/10_sim zeigen auf eigene Verzeichnisse (`user://saves_phase8`, `user://saves_test`,
-`user://saves_phase10`).
+phase8/9/10/11_sim zeigen auf eigene Verzeichnisse (`user://saves_phase8`, `user://saves_test`,
+`user://saves_phase10`, `user://saves_phase11`).
 Sonst würde ein Testlauf die echten Spielstände überschreiben. `phase9_sim` hat außerdem eine
 **Notbremse** (`FRAME_BUDGET`): es wartet an mehreren Stellen auf Signale, und ein Fehler darin
 würde headless nicht fehlschlagen, sondern ewig laufen. `phase10_sim` hat sie aus demselben

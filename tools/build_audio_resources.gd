@@ -70,9 +70,12 @@ const SOUNDS: Dictionary = {
 	&"door_move":     ["Sounds/Hit & Impact/Impact3.wav"],
 	&"save_point":    ["Jingles/Success1.wav"],
 
-	# Menue (Phase 9)
+	# Menue (Phase 9, erweitert in Phase 11)
 	&"menu_move":     ["Sounds/Menu/Move1.wav"],
 	&"menu_confirm":  ["Sounds/Menu/Accept.wav"],
+	# Zurueck/Abbrechen. Dieselbe Datei wie `switch_refused` und mit Absicht: ein Abbruch klingt
+	# wie ein Abbruch. Eine eigene ID braucht es trotzdem, weil die Frame-Dedup PRO ID greift.
+	&"menu_back":     ["Sounds/Menu/Cancel.wav"],
 }
 
 ## Musik und Jingles: ID -> genau eine Datei. Die Raeume nennen ihre ID in `Room.music_id`,
@@ -81,6 +84,9 @@ const MUSIC: Dictionary = {
 	&"dungeon":   "Musics/21 - Dungeon.ogg",
 	&"crypt":     "Musics/40 - Crypt.ogg",
 	&"game_over": "Jingles/GameOver.wav",
+	# Hauptmenue (Phase 11). Das Stueck des Packs, das am Anfang steht — bewusst kein
+	# Dungeon-Stueck: das Hauptmenue ist nicht im Spiel, es ist davor.
+	&"title":     "Musics/1 - Adventure Begin.ogg",
 }
 
 

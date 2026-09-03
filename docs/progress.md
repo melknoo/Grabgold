@@ -738,7 +738,7 @@ in Räumen.
   Gegner sind nach dem Wiederbetreten zurückgesetzt. Das Flag-System dafür kommt mit Phase 9
   (`world_flags` in `SaveData`).
 - **Kein Musik-/Ton-Wechsel:** `Room.music_id` ist angelegt und ungenutzt, `room_changed` hat noch
-  keinen Hörer (Phase 11).
+  keinen Hörer (damals für Phase 11 vorgesehen; tatsächlich in Phase 10 gebaut).
 - **`size_tiles` steht doppelt** — im Raum-Skript und in der `ROOMS`-Tabelle des Bau-Tools. Wer
   eines ändert, muss das andere mitändern (unverändertes Thema seit Phase 6).
 
@@ -1129,8 +1129,215 @@ nicht Umfang**.
 - **Die zwei Engine-Zeilen beim Beenden** bleiben im normalen Spiellauf stehen (siehe oben). Sie
   sind erklärt und harmlos, aber sie stehen da.
 
+## Phase 11 — Hülle: Hauptmenü, Slot-Auswahl, Optionen, Pause (abgeschlossen, 2026-09-03)
+
+Bis Phase 10 startete das Spiel **mitten im Dungeon**. `scenes/main.tscn` war `run/main_scene`
+und baute sich in `_ready` selbst den Startraum — es gab nie einen Zustand „Spiel läuft nicht".
+Zwei Dinge waren dadurch gebaut, aber unerreichbar: die drei Spielstand-Slots aus Phase 9
+(angelegt und adressierbar, aber ohne Auswahl-UI — der Spieler konnte nicht sehen, in welchen
+sein Speicherpunkt schreibt) und `AudioManager.set_bus_db` aus Phase 10 (eine API ohne Regler).
+Von den drei Kandidaten fiel die Wahl auf das Hauptmenü, weil es beide Löcher mit **einem**
+Umbau schließt — dem, den Phase 9 ausdrücklich angekündigt und verschoben hatte: „eine eigene
+Szene **vor** der persistenten Weltszene".
+
+**Die Hierarchie: drei Schichten, jede wirft die darunter weg**
+
+```
+Boot (nie gewechselt)   Hauptmenue, Optionen, Pause — die Huelle
+  +- WorldHost
+       +- main.tscn     persistente Weltszene: Player, PartyManager, Overlays
+            +- RoomHost
+                 +- room_0N.tscn   vom RoomManager getauscht (Phase 8)
+```
+
+Phase 8 hat den Raum wegwerfbar gemacht, Phase 11 die Welt. `scenes/main.gd` heißt seither
+`class_name World` und ist nicht mehr der Bootstrap, sondern etwas, das aufgebaut und wieder
+freigegeben wird.
+
+**Was steht**
+- **`scenes/boot.tscn` / `boot.gd`** (`class_name Boot`) — neue `run/main_scene`. Hält
+  `WorldHost`, `MainMenu`, `PauseMenu`, `OptionsMenu`; baut und verwirft die Weltszene, liest
+  die Pausentaste und verteilt zwischen den drei Bildschirmen.
+- **`World.enter_on_ready`** (`@export`, Default `true`) — betritt die Weltszene beim Aufbau
+  selbst den Startraum? Die Hülle setzt es **vor** `add_child` auf `false` und entscheidet dann
+  zwischen Startraum und Spielstand.
+- **`ui/main_menu/`** — Dateiauswahl über die drei Slots (voller lädt, leerer beginnt dort),
+  plus Optionen und Beenden. Löschen mit Inline-Bestätigung auf der Zeile.
+- **`ui/options_menu/`** — ein Regler je Bus (Gesamt / Musik / Effekte) plus Zurück. Zwei
+  Aufrufer (Hauptmenü, Pausenmenü), ein Bildschirm.
+- **`ui/pause_menu/`** — Weiter / Optionen / Hauptmenü.
+- **`globals/settings_manager.gd`** (Autoload `Settings`) — Lautstärkestufen 0..10 je Bus in
+  `user://settings.cfg`. Vierter Besitzer neben RoomManager (Raum), SaveManager (Fortschritt),
+  AudioManager (Ton).
+- **Input-Action `pause`** (Escape + Gamepad Start) — im Spiel Pause, in jedem Menü „zurück".
+  Angelegt wie alles andere über `tools/add_input_actions.gd`.
+- **Game-Over-Menü bekommt einen dritten Eintrag** („Hauptmenü") und das Signal
+  `menu_requested`; `World` reicht es als `main_menu_requested` nach oben.
+- **`RoomManager.clear_fade()`** — die Transitions-Blende lebt im Autoload und überlebt jede
+  Welt; wer eine wegwirft, muss sie zurücksetzen.
+- **Zwei neue Einträge in den Audio-Tabellen:** Musik `title`
+  (`Musics/1 - Adventure Begin.ogg`) und Effekt `menu_back` (`Sounds/Menu/Cancel.wav`) —
+  eine Zeile in `tools/build_audio_resources.gd`, kein Code.
+- **Debug-Overlay** zeigt die drei Pegel in Prozent und markiert einen eingefrorenen Raum mit
+  `PAUSE` — ein stehender Raum sieht auf dem Bild sonst wie ein hängendes Spiel aus.
+
+**Entscheidungen und ihre Gründe**
+- *Die Menüs liegen in der Hülle, nicht in der Weltszene.* Das Hauptmenü muss **ohne** Welt
+  existieren, und Options- und Pausenbildschirm teilen sich einen Bildschirm mit ihm. Das
+  Game-Over-Menü bleibt dagegen in der Welt — es gehört zum Sterben, nicht zur Hülle.
+- *Zurück ins Hauptmenü wirft die Welt weg, statt sie anzuhalten.* Ein Spiel, das hinter dem
+  Menü weiterlebte, wäre ein zweiter Weltzustand neben dem Spielstand, und die Frage „welcher
+  gilt" hat keine gute Antwort. Freigegeben wird mit `remove_child` **plus** `queue_free`
+  (Muster aus `RoomManager._swap_room`: `queue_free` allein ließe den Node bis zum Frame-Ende
+  im Baum, und der RoomManager löst seine Referenzen erst am `tree_exiting` des RoomHost).
+- *`enter_on_ready` behält den Default `true`.* Die sechs Suiten davor hängen `main.tscn` als
+  Kind unter sich und wollen sofort eine laufende Welt — sie prüfen den Raum, nicht das Menü.
+  Genau das Muster von `restart_on_wipe` aus Phase 7; die Alternative wäre gewesen, sechs
+  Testsuiten für eine Zeile umzubauen.
+- *Kein Menü liest in demselben Frame denselben Tastendruck.* Wer einen anderen Bildschirm
+  aufmacht, blendet seinen eigenen aus (`close()`), und jeder hat nach `open()` **einen Frame
+  Schonzeit** (`_grace`). Ohne die schlüge der `pause`-Druck, der die Optionen öffnet, im
+  Pausenmenü gleich noch einmal zu — beide lesen dasselbe `just_pressed`.
+- *Hauptmenü = Dateiauswahl (ALTTP), nicht „Neues Spiel / Laden / Optionen".* Ein voller Slot
+  lädt, ein leerer beginnt dort. Damit ist der Slot **immer bewusst gewählt** — bis Phase 10
+  schrieb jeder Speicherpunkt in `SaveManager.active_slot`, und welcher das war, sah man nirgends.
+- *Löschen gehört ins Hauptmenü, sonst ist die Auswahl eine Sackgasse.* Ohne Löschen ließe sich
+  nach drei Spielständen kein neues Spiel mehr beginnen, weil ein voller Slot immer lädt. Die
+  Bestätigung liegt **auf der Zeile selbst** (Q lädt scharf, F löscht, Q bricht ab, Wegbewegen
+  entschärft) statt in einem eigenen Dialog: ein Modus weniger, und die scharfe Löschung ist
+  immer da zu sehen, wo sie wirkt.
+- *Ein leerer Slot ist hier anwählbar und darum nicht grau* — anders als im Game-Over-Menü, wo
+  derselbe leere Slot nichts zu laden hat. Dieselbe Farbe für zwei verschiedene Aussagen wäre
+  falsch.
+- *Der dritte Game-Over-Eintrag ist keine Bequemlichkeit.* Ohne ihn wäre der Tod eine Sackgasse:
+  man käme nur in den Speicherstand oder einen Neuanfang, nie in einen anderen Slot und nie an
+  die Optionen — denn das Pausenmenü geht im Game Over bewusst nicht auf.
+- *Die Pause friert mit den Mitteln aus Phase 9:* `RoomManager.set_room_frozen` (`process_mode`
+  am `RoomHost`) plus `Player.set_input_locked`, gebündelt in `World.set_paused`. Ausdrücklich
+  **nicht** `get_tree().paused` und nicht `Engine.time_scale` — dasselbe Argument wie beim
+  HitstopManager: es trifft genau die gewünschten Nodes und lässt UI, Blenden und Ton in Ruhe.
+- *Die Musik läuft in der Pause weiter.* Sonst wäre der Musikregler nicht zu hören, während man
+  ihn zieht. Der Reif räumt seinen gehaltenen Klang bei der Input-Sperre selbst auf (Phase 10) —
+  ein Summen durch die Pause gibt es damit von selbst nicht.
+- *Die Pausentaste wird in der Hülle gelesen, nicht in der Welt.* Nur die Hülle weiß, ob gerade
+  ein anderer Bildschirm offen ist. Sie geht nicht auf während einer Blende
+  (`RoomManager.is_transitioning`) und nicht im Game Over (`World.accepts_pause`).
+- *Einstellungen liegen NICHT im Spielstand.* Eine Lautstärke gehört dem Gerät, nicht dem
+  Durchlauf — wer Slot 2 lädt, will nicht die Pegel von Slot 1.
+- *`ConfigFile` statt JSON wie `SaveData` (Phase 9).* Es ist die Einrichtung der Engine, von
+  Hand lesbar (INI), und `get_value(section, key, default)` trägt ein später dazukommendes Feld
+  von selbst — genau die Eigenschaft, die in Phase 9 für JSON gesprochen hat. Eine
+  Versionsnummer braucht sie nicht: eine unbekannte Datei kostet hier höchstens eine
+  Lautstärke, während ein halb angewandter Spielstand ein kaputtes Spiel wäre.
+- *Übernommen wird Schlüssel für Schlüssel* — und nur, was da ist und eine Zahl ist. Ein
+  fehlender Schlüssel lässt den laufenden Wert stehen, statt ihn auf die Vorgabe zurückzusetzen;
+  sonst risse eine halb geschriebene Datei die anderen Regler mit.
+- *Der Pegel ist eine Stufe 0..10 und relativ zur Vorgabe.* Stufe 10 heißt „wie der Autor es
+  gemischt hat" (Musik −9 dB aus dem generierten Bus-Layout), nicht „0 dB". Ein Regler, der
+  absolute dB setzte, hätte beim ersten Griff die Mischung aus Phase 10 eingerissen. Stufe 0 ist
+  `SILENT_DB` (−80), weil `linear_to_db(0.0)` −inf wäre.
+- *Geschrieben wird bei jedem Schritt*, nicht erst beim Schließen des Menüs: drei Zeilen INI
+  kosten nichts, und ein „dirty"-Merker wäre ein Zustand, den man falsch machen kann.
+- *Die Regler zeigen Prozentzahlen, keinen Balken.* Der Standardfont ist nicht monospaced; ein
+  aus `|` und Leerzeichen gebauter Balken wackelte bei jedem Schritt. Eingetragen in
+  `docs/assets-todo.md` — mit einem Pixelfont wird eine Zahl zum Balken.
+
+**Beim Bau aufgelaufen (und behoben)**
+- *`ConfigFile.load` meldet bei Müll trotzdem `OK`.* Die erste Fassung von `load_from_disk()`
+  prüfte den Rückgabewert und las danach jeden Schlüssel mit Default — eine kaputte Datei setzte
+  damit **alle** Regler auf die Vorgabe zurück. Der Test hat es aufgedeckt (er erwartete einen
+  Fehlschlag und bekam Erfolg). Jetzt entscheidet nicht der Rückgabewert, sondern
+  `has_section_key` plus eine Typprüfung je Wert.
+- *Ein laufender Abspieler beim Prozessende hinterlässt geleakte Playbacks* — die Zeilen aus
+  Phase 10, dort an einem Ogg beobachtet, gelten genauso für WAV. Der Klang-Abschnitt der neuen
+  Suite endete mit absichtlich noch laufenden Effekten; jetzt wartet er, bis der AudioServer sie
+  losgelassen hat, statt die Zeilen als „harmlos" zu erklären.
+- *`_on_world_exiting` setzt jetzt auch `_transitioning` zurück.* Keine Welt, kein Raumwechsel —
+  ein stehengebliebenes Flag würde in der nächsten Welt jeden Wechsel schlucken.
+
+**Verifikation (headless, `tests/phase11_sim.*`, 146/146 grün)**
+- **Einstellungen:** drei Busse in fester Reihenfolge; Stufe 10 ist der Pegel des Mixes
+  (Master 0 dB, Musik −9 dB) und steht so auch im AudioServer; halbe Stufe halbiert die
+  Amplitude **relativ** dazu; Stufe 0 ist echte Stille; nach oben und unten geklemmt; derselbe
+  Wert meldet kein `changed`; die Datei liegt auf Platte und die Werte überleben den Weg
+  hinaus und zurück; eine kaputte Datei lässt die laufenden Werte stehen; ein unbrauchbarer
+  Wert wird übersprungen, während der brauchbare daneben ankommt; ein fehlender Schlüssel
+  ändert nichts; `reset()` stellt die Vorgabe wieder her.
+- **Startzustand:** Hauptmenü offen und sichtbar, **keine Welt**, kein Raum gebunden, Titelstück
+  läuft, alle drei Slots zeigen „leer"; die Pausentaste tut ohne Welt nichts; an beiden
+  Listenrändern passiert nichts.
+- **Neues Spiel in Slot 2:** `new_game_requested(2)`, Welt steht, Menü zu, aktiver Slot ist 2,
+  Startraum betreten, Raummusik löst das Titelstück ab, Input frei, Spielzeit läuft.
+- **Zurück ins Hauptmenü über die Pause:** Raum eingefroren und Input gesperrt, „Hauptmenü"
+  gewählt → Welt weggeworfen **und abgemeldet**, Titelstück wieder da, die Blende des
+  Raumwechsels ist klar, Slot 2 zeigt jetzt seine Kopfdaten und Slot 1 weiter „leer".
+- **Laden:** `load_requested(2)`, Raum aus dem Spielstand, Input nach dem Aufbau frei.
+- **Löschen:** Laden scharf machen, die Zeile fragt nach; Wegbewegen nimmt es zurück; zweiter
+  Druck bricht ab; Bestätigen löscht den Slot, die Zeile zeigt „leer" und es wird **kein**
+  Ladevorgang ausgelöst (der Druck galt der Löschung); ein leerer Slot hat nichts zu löschen;
+  auf Optionen/Beenden wirkt es nicht.
+- **Optionen:** aus dem Hauptmenü geöffnet blendet dieses aus; ein Regler je Bus plus Zurück;
+  links senkt, rechts hebt, am Anschlag passiert nichts, der zweite Regler ist die Musik und
+  lässt Master in Ruhe; links/rechts auf „Zurück" ist ein No-Op; nach dem Schließen ist das
+  Hauptmenü wieder da — **auf dem Eintrag, den man gedrückt hat**.
+- **Pause:** die Taste öffnet, der Raum steht (nachgewiesen daran, dass **das Skelett sich zehn
+  Frames lang nicht bewegt**, nicht nur daran, dass ein Flag gesetzt ist), dieselbe Taste
+  schließt wieder; aus der Pause in die Optionen: Pausenmenü aus, Raum steht weiter, Input
+  bleibt gesperrt, **die Musik läuft**, der Regler wirkt; Escape führt zurück ins Pausenmenü auf
+  denselben Eintrag; „Weiter" lässt die Welt wieder laufen.
+- **Wann die Pause nicht aufgeht:** nicht während einer Blende, nicht bei ausgefallener Party,
+  nicht über dem Game-Over-Menü.
+- **Game-Over-Menü:** bei leerem Slot ist „Neu beginnen" vorausgewählt, „Hauptmenü" ist
+  erreichbar und der letzte Eintrag; Bestätigen wirft die Welt weg, öffnet das Hauptmenü, startet
+  das Titelstück und lässt **keinen Jingle** darunter weiterlaufen.
+- **Klang (echter Ton, nur WAV):** Navigation klickt, am Listenrand bleibt es still, Löschen auf
+  einem leeren Slot bleibt still, Bestätigen klickt, der Regler klickt beim Verstellen (auf dem
+  SFX-Bus — wer die Effekte leiser zieht, hört das Klicken leiser werden), Zurück klingt nach
+  Abbruch.
+- **Der Test räumt auf** (eigenes Save-Verzeichnis `user://saves_phase11` **und** eigene
+  `settings_phase11.cfg`, beide am Ende weg) und hat eine **Notbremse**
+  (`FRAME_BUDGET = 7000`), aus demselben Grund wie phase9/phase10_sim.
+- **Regression:** phase4 (27), phase5 (57), phase6 (28), phase7 (37), phase8 (84), phase9 (135),
+  phase10 (120) alle weiterhin „ALLES GRUEN" — zusammen mit phase11 (146) **634 Checks**,
+  0 Fehler. `phase10_sim` musste an einer Stelle nachziehen: der untere Rand des Game-Over-Menüs
+  liegt seit dem dritten Eintrag eine Zeile tiefer.
+- **Fensterlauf** fehlerfrei.
+
+**Was in Phase 9 und 10 offen war und jetzt zu ist**
+- „Die drei Slots sind angelegt und adressierbar, eine Slot-Auswahl-UI fehlt" (Phase 9) — steht.
+- „Keine Lautstärke-UI. `set_bus_db` steht, aber im Spiel erreicht man es nicht" (Phase 10) —
+  steht, samt der Persistenz, die Phase 10 dafür als Voraussetzung genannt hatte.
+- „Ein Hauptmenü wäre eine eigene Szene vor der persistenten Weltszene und damit ein eigener
+  Umbau" (Phase 9) — der Umbau ist gemacht.
+
+**Offen / bekannte Punkte**
+- **Die Feel-Abnahme des Mixes steht weiter aus** und ist jetzt bequemer geworden, nicht
+  erledigt: die Regler sind da, die 18 Klang-Zuordnungen sind immer noch nach Ordnernamen
+  gewählt und nicht nach Gehör. Neu dazu kommt das Titelstück, das ebenfalls ungehört gewählt
+  ist. Ändern heißt weiterhin eine Zeile in `SOUNDS`/`MUSIC` plus ein Tool-Lauf.
+- **Alle vier Menüs laufen auf Godots Standardfont.** Mit Phase 11 ist das kein Kosmetikpunkt
+  mehr: das Hauptmenü ist der **erste** Bildschirm des Spiels und besteht ausschließlich aus
+  Text. Siehe `docs/assets-todo.md`.
+- **Kein Titelbild, kein Logo** — nur ein Schriftzug auf dunkler Fläche. Im Pack liegt nichts
+  Passendes; ein Titelbild wäre eigene Kunst, keine Pack-Auswahl.
+- **Die Optionen kennen nur Lautstärke.** Fenstermodus, Auflösung und Tastenbelegung fehlen —
+  die Belegung wäre der größte Brocken, weil `tools/add_input_actions.gd` bisher die einzige
+  Quelle der Belegung ist und beim Lauf die komplette Map überschreibt. Eine UI, die daneben
+  schreibt, bräuchte erst eine Entscheidung, wem die Belegung gehört.
+- **Kein „Fortsetzen" im Hauptmenü** über den zuletzt benutzten Slot hinaus — es gibt keinen,
+  weil `active_slot` nicht persistiert wird. Beim Start steht die Auswahl immer auf Slot 1.
+- **Die Pause hat kein eigenes Bild.** Sie legt eine halbtransparente Fläche über den stehenden
+  Raum; ein unscharf gezeichneter Hintergrund oder ein Rahmen wäre der nächste Schritt.
+- **Beenden nur aus dem Hauptmenü.** Aus der Pause führt der Weg über „Hauptmenü" — bewusst,
+  damit ein Fehlgriff nicht das Spiel schließt.
+- **Die zwei Engine-Zeilen beim Beenden** (Phase 10) bleiben im normalen Spiellauf stehen,
+  jetzt ausgelöst vom Titelstück. Sie sind erklärt und harmlos, aber sie stehen da.
+
 ## Nächste Phase
-- **Phase 11** — noch nicht festgelegt. Die Kandidaten von Phase 10 stehen weiter offen:
-  Hauptmenü mit Slot-Auswahl (plus Optionen, für die es seit dieser Phase einen Grund gibt) oder
-  Raum-Inhalt statt Testgerüst. Neu dazu: eine **Feel-Abnahme des Mixes**, die keine eigene Phase
-  sein muss, aber vor jedem weiteren Ton-Ausbau stattfinden sollte. Erst nach Go des Users.
+- **Phase 12** — noch nicht festgelegt. Von den drei Kandidaten aus Phase 10 ist einer erledigt
+  (Hauptmenü mit Slot-Auswahl **und** Optionen). Offen bleiben:
+  **Raum-Inhalt statt Testgerüst** (B und C sind bewusst Gerüst, kein Content) und die
+  **Feel-Abnahme des Mixes**, die keine eigene Phase sein muss, aber vor jedem weiteren
+  Ton-Ausbau stattfinden sollte — die Regler dafür stehen seit dieser Phase.
+  Neu dazu: ein **projektweites `Theme` mit Pixelfont**, weil das Spiel jetzt mit einem
+  Textbildschirm anfängt. Erst nach Go des Users.

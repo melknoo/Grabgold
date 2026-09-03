@@ -462,13 +462,17 @@ func _ready() -> void:
 	menu.move_selection(1)
 	await physics(1)
 	check("Menue-Navigation klickt", AudioManager.play_count(&"menu_move") == n + 1)
+	# Seit Phase 11 hat das Menue einen dritten Eintrag ("Hauptmenue"): der untere Rand der Liste
+	# liegt eine Zeile tiefer als in Phase 10.
+	menu.move_selection(1)
+	await physics(1)
 	n = AudioManager.play_count(&"menu_move")
 	menu.move_selection(1)  # steht schon am unteren Rand
 	await physics(1)
 	check("Am Rand der Liste bleibt es still",
 		AudioManager.play_count(&"menu_move") == n, "%d" % AudioManager.play_count(&"menu_move"))
 	n = AudioManager.play_count(&"menu_confirm")
-	menu.move_selection(-1)
+	menu.move_selection(-99)  # zurueck nach oben auf den Speicherstand
 	await physics(1)
 	menu.confirm()
 	check("Bestaetigen klickt", AudioManager.play_count(&"menu_confirm") == n + 1)

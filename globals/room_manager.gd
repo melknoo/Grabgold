@@ -61,6 +61,9 @@ func _on_world_exiting() -> void:
 	_party = null
 	_room = null
 	_room_id = &""
+	# Keine Welt, kein Raumwechsel. Wirft die Huelle (Phase 11) eine Welt weg, darf kein
+	# gesetztes `_transitioning` in die naechste hineinragen und dort JEDEN Wechsel schlucken.
+	_transitioning = false
 
 func is_bound() -> bool:
 	return _host != null and is_instance_valid(_host)
@@ -111,6 +114,13 @@ func is_room_frozen() -> bool:
 
 func fade_alpha() -> float:
 	return _fade.alpha() if _fade != null else 0.0
+
+## Blende klar zuruecksetzen. Aufrufer ist die Huelle (Phase 11), wenn sie eine Welt wegwirft:
+## die Blende lebt in diesem Autoload und ueberlebt jede Welt — bliebe sie schwarz stehen, laege
+## sie ueber dem ersten Frame der naechsten.
+func clear_fade() -> void:
+	if _fade != null:
+		_fade.set_black(false)
 
 ## Spielstart: Startraum ohne Blende. Es gibt nichts wegzublenden.
 func enter_start_room() -> void:

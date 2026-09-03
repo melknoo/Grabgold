@@ -49,13 +49,23 @@ func _initialize() -> void:
 	])
 
 	# Weltinteraktion (ab Phase 8): Raum-Tueren mit `auto_enter = false`, ab Phase 9 die
-	# Speicherpunkte, ab Phase 11 die NPCs. F liegt fuer die WASD-Hand in Reichweite, ohne mit
+	# Speicherpunkte. Ab Phase 11 bestaetigt sie ausserdem in jedem Menue — dieselbe Taste im
+	# Spiel und im Menue. F liegt fuer die WASD-Hand in Reichweite, ohne mit
 	# Angriff (E) oder Dash (Space/Shift) zu kollidieren; Enter ist die Tastatur-Zweitbelegung.
 	# Gamepad Y, weil A der Dash und die Schultertasten der Figurenwechsel sind.
 	_write(&"interact", [
 		_key(KEY_F),
 		_key(KEY_ENTER),
 		_pad(JOY_BUTTON_Y),
+	])
+
+	# Menues (ab Phase 11): Pause im Spiel, Zurueck in jedem Menue. Escape ist die Taste, die
+	# jeder dafuer sucht; Start am Gamepad. Navigiert und bestaetigt wird in den Menues mit
+	# `move_*` und `interact`/`attack` — dafuer gibt es bewusst KEINE eigenen Menue-Actions:
+	# der Spieler soll dieselben Tasten druecken wie im Spiel.
+	_write(&"pause", [
+		_key(KEY_ESCAPE),
+		_pad(JOY_BUTTON_START),
 	])
 
 	_write(&"debug_toggle", [_key(KEY_F1)])

@@ -21,6 +21,9 @@
   Musikstücke (`Musics/21 - Dungeon.ogg`, `Musics/40 - Crypt.ogg`) und `Jingles/GameOver.wav`.
   Die vollständige Zuordnung „Spielereignis → Datei" steht in den Tabellen `SOUNDS` und `MUSIC`
   in `tools/build_audio_resources.gd` und nirgends sonst.
+- **Ab Phase 11 zusätzlich:** `Musics/1 - Adventure Begin.ogg` als Titelstück des Hauptmenüs und
+  `Sounds/Menu/Cancel.wav` als Zurück-/Abbruch-Klang (`menu_back`). Beide stehen in denselben
+  Tabellen — ein neuer Klang bleibt eine Zeile in `tools/build_audio_resources.gd`.
 - **Abgelegt unter:** `assets/external/Ninja Adventure - Asset Pack/`
 - **Eingebunden am:** 2026-08-20
 

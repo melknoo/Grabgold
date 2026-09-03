@@ -75,12 +75,21 @@ nachmalen, nichts herunterladen.
       Tile fuer Schrein/Statue/Feuerschale vorhanden, und geraten wird nicht. Kandidaten zum
       Sichten: `TilesetDungeon.png` (Statuen-/Altarfelder), `FX/Magic/Circle/` fuer einen
       Bodenkreis, `Items/` fuer eine Kerze oder Schale.
-- [ ] **Game-Over-Menue (Phase 9) laeuft auf Godots Standardfont** — `ui/game_over_menu/`
-      setzt nur Groessen (16 fuer den Titel, 8 fuer die Eintraege). Bei 320x180 interner
-      Auflösung ist der Vektorfont weich, waehrend alles andere Pixelkunst ist. Das Pack hat
-      keinen Bitmap-Font; ein CC0-Pixelfont muesste **manuell** abgelegt werden (nichts
-      herunterladen, siehe Kickoff-Regel) und dann als `Theme` fuer alle UI-Labels gelten,
-      inklusive Debug-Overlay.
+- [ ] **Alle Menues laufen auf Godots Standardfont** — `ui/game_over_menu/` (Phase 9) und seit
+      Phase 11 auch `ui/main_menu/`, `ui/options_menu/` und `ui/pause_menu/` setzen nur Groessen
+      (16/12 fuer Titel, 8 fuer die Eintraege). Bei 320x180 interner Auflösung ist der Vektorfont
+      weich, waehrend alles andere Pixelkunst ist. Das Pack hat keinen Bitmap-Font; ein
+      CC0-Pixelfont muesste **manuell** abgelegt werden (nichts herunterladen, siehe
+      Kickoff-Regel) und dann als `Theme` fuer alle UI-Labels gelten, inklusive Debug-Overlay.
+      **Mit Phase 11 ist das kein Kosmetikpunkt mehr:** das Hauptmenue ist der erste Bildschirm
+      des Spiels, und er besteht ausschliesslich aus Text.
+- [ ] **Die Lautstaerkeregler zeigen eine Zahl, keinen Balken** (`ui/options_menu/`) — bewusst:
+      der Standardfont ist nicht monospaced, ein aus `|` und Leerzeichen gebauter Balken wackelt
+      bei jedem Schritt. Mit einem Pixelfont (Punkt darueber) oder einer 1-px-`ColorRect`-Reihe
+      wird daraus ein Balken; vorher ist eine Zahl ehrlicher als ein schiefer Balken.
+- [ ] **Das Hauptmenue hat kein Titelbild und kein Logo** — nur der Schriftzug „GRABGOLD" auf
+      einer dunklen Flaeche. Im Pack liegt nichts Passendes (`Backgrounds/` sind Tilesets, keine
+      Bildschirme); ein Titelbild ist eigene Kunst, nicht Pack-Auswahl. Bewusst offen.
 - [ ] **Knight hat kein Hit-Sheet** → hurt = Idle-Pose + Blink (wie beim Skelett). Kein Ersatz im
       Pack vorhanden; bleibt Platzhalter-Feedback.
 
@@ -100,4 +109,7 @@ nachmalen, nichts herunterladen.
 | Game-Over-Menue mit Standardfont | CC0-Pixelfont als projektweites `Theme` | 9 | Platzhalter |
 | Tuerklang = `Hit & Impact/Impact3.wav` (+ Pitch 0,8 zum Schliessen) | echter Stein-/Torklang (im Pack nicht vorhanden) | 10 | Behelf |
 | 18 Klang-IDs nach Ordnernamen gewaehlt | Auswahl nach Gehoer in der Feel-Abnahme | 10 | ungehoert |
+| Titelstueck = `Musics/1 - Adventure Begin.ogg` | Auswahl nach Gehoer (Feel-Abnahme) | 11 | ungehoert |
+| Hauptmenue = Schriftzug auf dunkler Flaeche | Titelbild/Logo (eigene Kunst, nicht im Pack) | 11 | offen |
+| Lautstaerkeregler zeigen Prozentzahlen | Balken, sobald ein Pixelfont da ist | 11 | Behelf |
 | Korruptionsstufe 1 = nur Vignette | + Fluester-Layer (Infrastruktur steht ab Phase 10, zweiter Loop-Platz fehlt) | 5/10 | Feedback unvollstaendig |

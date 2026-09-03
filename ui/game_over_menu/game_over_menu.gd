@@ -3,9 +3,10 @@ extends CanvasLayer
 ## Game-Over-Bildschirm (Phase 9). Liegt UEBER der Schwarzblende aus Phase 7 (`GameOverFade`,
 ## Layer 4) und uebernimmt genau dort, wo die bis Phase 8 blind neu gestartet hat.
 ##
-## Zwei Eintraege: "Letzter Speicherstand" (aktiver Slot) und "Neu beginnen" (Startraum, Flags
-## und Spielzeit auf Null). Ein Hauptmenue gibt es bewusst noch nicht — es waere eine eigene
-## Szene VOR der persistenten Weltszene und damit ein eigener Umbau.
+## Drei Eintraege: "Letzter Speicherstand" (aktiver Slot), "Neu beginnen" (Startraum, Flags und
+## Spielzeit auf Null) und seit Phase 11 "Hauptmenue". Der dritte ist keine Bequemlichkeit: ohne
+## ihn waere der Tod eine Sackgasse — man kaeme nie in einen anderen Slot und nie an die
+## Optionen, weil das Pausenmenue im Game Over bewusst nicht aufgeht.
 ##
 ## Eingabe per Polling im _physics_process aus dem `Input`-Singleton, wie ueberall im Projekt
 ## (Player, Reif, PartyManager, RoomExit): dieselbe Stelle, dieselben Actions, und ein Test kann
@@ -16,15 +17,19 @@ extends CanvasLayer
 signal load_requested(slot: int)
 ## Neues Spiel.
 signal restart_requested
+## Zurueck in die Huelle (Phase 11). Die Weltszene reicht das nach oben weiter — sie kann sich
+## nicht selbst wegwerfen.
+signal menu_requested
 
 ## Auswahl in fester Reihenfolge. Der Ladeeintrag steht oben und ist vorausgewaehlt: nach einem
 ## Tod will man in fast allen Faellen den Speicherstand.
-enum Option { LOAD, RESTART }
+enum Option { LOAD, RESTART, MENU }
 
 @onready var _title: Label = $Center/Box/Title
 @onready var _slot_line: Label = $Center/Box/SlotLine
 @onready var _entry_load: Label = $Center/Box/EntryLoad
 @onready var _entry_restart: Label = $Center/Box/EntryRestart
+@onready var _entry_menu: Label = $Center/Box/EntryMenu
 
 var _open: bool = false
 var _index: int = Option.LOAD
@@ -65,7 +70,7 @@ func close() -> void:
 func move_selection(step: int) -> void:
 	if not _open:
 		return
-	var next: int = clampi(_index + step, Option.LOAD, Option.RESTART)
+	var next: int = clampi(_index + step, Option.LOAD, Option.MENU)
 	if next == Option.LOAD and not _can_load:
 		return  # ein leerer Slot ist nicht anwaehlbar, nicht nur nicht ausfuehrbar
 	if next == _index:
@@ -81,10 +86,13 @@ func confirm() -> void:
 		return
 	AudioManager.play(&"menu_confirm")
 	close()
-	if _index == Option.LOAD:
-		load_requested.emit(_slot)
-	else:
-		restart_requested.emit()
+	match _index:
+		Option.LOAD:
+			load_requested.emit(_slot)
+		Option.RESTART:
+			restart_requested.emit()
+		_:
+			menu_requested.emit()
 
 func _physics_process(_delta: float) -> void:
 	if not _open:
@@ -99,6 +107,7 @@ func _physics_process(_delta: float) -> void:
 func _refresh() -> void:
 	_entry_load.text = "%s Letzter Speicherstand" % (">" if _index == Option.LOAD else " ")
 	_entry_restart.text = "%s Neu beginnen" % (">" if _index == Option.RESTART else " ")
+	_entry_menu.text = "%s Hauptmenue" % (">" if _index == Option.MENU else " ")
 	# Grau = vorhanden, aber nicht anwaehlbar. Ein ausgeblendeter Eintrag waere schlechter: der
 	# Spieler soll sehen, DASS es einen Speicherstand-Eintrag gibt.
 	_entry_load.modulate = Color(1, 1, 1, 1) if _can_load else Color(0.45, 0.45, 0.45, 1)

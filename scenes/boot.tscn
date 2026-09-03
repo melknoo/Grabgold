@@ -1,0 +1,17 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/boot.gd" id="1_boot"]
+[ext_resource type="PackedScene" path="res://ui/main_menu/main_menu.tscn" id="2_mainmenu"]
+[ext_resource type="PackedScene" path="res://ui/pause_menu/pause_menu.tscn" id="3_pause"]
+[ext_resource type="PackedScene" path="res://ui/options_menu/options_menu.tscn" id="4_options"]
+
+[node name="Boot" type="Node"]
+script = ExtResource("1_boot")
+
+[node name="WorldHost" type="Node" parent="."]
+
+[node name="MainMenu" parent="." instance=ExtResource("2_mainmenu")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("3_pause")]
+
+[node name="OptionsMenu" parent="." instance=ExtResource("4_options")]

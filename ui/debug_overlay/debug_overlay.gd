@@ -26,7 +26,7 @@ func _process(_dt: float) -> void:
 		"FPS: %d\nFigur: %s  HP: %d/%d  Gewicht: %.1f\nState: %s\nFacing: %s\nAnim: %s [%d]\n"
 		+ "REIF: %s  Stufe %d%s\nKorruption: %.1f %%\nDash-CD: %d  Phasing: %s\n"
 		+ "Raum: %s\nSlot %d%s  Zeit %s  Flags %d\n"
-		+ "Musik: %s%s  SFX: %s (%d)  Loop: %s\nDebugBoxes: %s"
+		+ "Musik: %s%s  SFX: %s (%d)  Loop: %s\nPegel: %d/%d/%d  DebugBoxes: %s"
 	) % [
 		Engine.get_frames_per_second(),
 		figure,
@@ -52,6 +52,12 @@ func _process(_dt: float) -> void:
 		_or_dash(AudioManager.last_played()),
 		AudioManager.active_sfx_count(),
 		_or_dash(AudioManager.loop_id()),
+		# Die Pegel aus dem Optionsmenue (Phase 11), Master/Musik/Effekte in Prozent. Sie stehen
+		# hier, weil die Feel-Abnahme des Mixes noch aussteht: wer am Regler zieht, soll sehen,
+		# wo er gerade steht.
+		Settings.volume_percent(&"Master"),
+		Settings.volume_percent(&"Music"),
+		Settings.volume_percent(&"SFX"),
 		str(Debug.show_boxes),
 	]
 
@@ -83,9 +89,12 @@ func _room_text() -> String:
 	if _room == null:
 		return "-"
 	var extra: String = _room.debug_text()
-	return "%s%s%s" % [
+	return "%s%s%s%s" % [
 		_room.room_id,
 		"  WECHSEL %.2f" % RoomManager.fade_alpha() if RoomManager.is_transitioning() else "",
+		# Ein eingefrorener Raum sieht auf dem Bild wie ein haengendes Spiel aus (Phase 11: Pause,
+		# seit Phase 9: Game Over). Die Marke sagt, dass es Absicht ist.
+		"  PAUSE" if RoomManager.is_room_frozen() else "",
 		("  " + extra) if extra != "" else "",
 	]
 
