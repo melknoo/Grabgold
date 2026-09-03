@@ -269,7 +269,7 @@ func _ready() -> void:
 		RoomManager.current_room().get_node_or_null("Skeleton") != null)
 	# Markierter Gegner bleibt weg.
 	await transition(&"room_03", &"start")
-	var boss: Skeleton = RoomManager.current_room().get_node("Skeleton")
+	var boss: Skeleton = RoomManager.current_room().get_node("Waechter")
 	check("Gegner in C hat persist_id", boss.persist_id == &"skeleton_c", str(boss.persist_id))
 	check("noch nicht als erledigt vermerkt", not SaveManager.is_killed(&"skeleton_c"))
 	await kill(boss)
@@ -281,7 +281,7 @@ func _ready() -> void:
 	await transition(&"room_03", &"start")
 	await physics(2)
 	check("markierter Gegner bleibt weg",
-		RoomManager.current_room().get_node_or_null("Skeleton") == null)
+		RoomManager.current_room().get_node_or_null("Waechter") == null)
 	# Neues Spiel raeumt die Flags -> er steht wieder.
 	SaveManager.new_game()
 	await settle()
@@ -295,7 +295,7 @@ func _ready() -> void:
 	await transition(&"room_02", &"start")
 	await transition(&"room_03", &"start")
 	check("Gegner nach Neuanfang wieder da",
-		RoomManager.current_room().get_node_or_null("Skeleton") != null)
+		RoomManager.current_room().get_node_or_null("Waechter") != null)
 	# Und der Spielstand bringt das Flag zurueck.
 	SaveManager.load_from_slot(1)
 	await settle()
@@ -303,9 +303,9 @@ func _ready() -> void:
 	check("und den Raum C", RoomManager.current_room_id() == &"room_03",
 		str(RoomManager.current_room_id()))
 	check("Gegner nach dem Laden wieder weg",
-		RoomManager.current_room().get_node_or_null("Skeleton") == null)
+		RoomManager.current_room().get_node_or_null("Waechter") == null)
 	check("Spieler auf dem Spawn save_c",
-		player.global_position.is_equal_approx(Vector2(104, 88)), str(player.global_position))
+		player.global_position.is_equal_approx(Vector2(312, 128)), str(player.global_position))
 
 	section("8. Game Over haelt die Welt an")
 	check("Menue geschlossen, solange das Spiel laeuft", not menu.is_open())

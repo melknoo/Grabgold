@@ -60,6 +60,16 @@ nachmalen, nichts herunterladen.
       (Raum B und C). Kein Kampfstueck, obwohl `17 - Fight.ogg` und `34 - Fight.ogg` bereitliegen
       — ein Kampfwechsel braucht einen Aggro-Zustand ueber alle Gegner eines Raums, und den gibt
       es nicht. `music_id` steht pro Raum bereit, ein drittes Stueck ist eine Zeile.
+      **Seit Phase 12 gibt es den Aufhaenger:** der Riegel in Raum B weiss genau, wann der Kampf
+      laeuft (`Room02.enemies_alive()`) und wann er vorbei ist (`is_cleared()`).
+- [ ] **Der Riegel in Raum B hat kein eigenes Sprite** (Phase 12) — er zeigt zweimal dieselbe
+      Tuer-Kachel wie Raum 01 (`TilesetDungeon.png` (0,0)), uebereinander gestapelt. Richtig
+      lesbar waere ein Fallgitter, das sichtbar herunter- und hochfaehrt; im Pack liegt dafuer
+      nichts Geprueftes. Kandidaten zum Sichten: `TilesetDungeon.png` (Tor-/Gitterfelder).
+- [ ] **Der Waechter kaempft wie ein Skelett** (Phase 12), nur zaeher: dieselbe FSM, dieselbe
+      Reichweite, ein Angriff. Kein Asset-Problem — aber der Punkt, an dem Raum C mehr waere als
+      eine Huerde, waere ein zweiter Angriffs-State (Ausfallschritt, Flaechenschlag). Sprites
+      dafuer haette das Sheet (`SkeletonDemon/SeparateAnim/Special1.png`, `Special2.png`).
 - [ ] **Optionaler Kanal-Effekt fuer den Reif** — solange kanalisiert wird, gibt es aktuell kein
       Sprite-Feedback am Spieler (nur die Vignette ab Stufe 1). Kandidat im Pack:
       `FX/Magic/Aura/` bzw. `FX/Magic/Circle/`. Bewusst offen: erst nach der Feel-Abnahme
@@ -113,3 +123,5 @@ nachmalen, nichts herunterladen.
 | Hauptmenue = Schriftzug auf dunkler Flaeche | Titelbild/Logo (eigene Kunst, nicht im Pack) | 11 | offen |
 | Lautstaerkeregler zeigen Prozentzahlen | Balken, sobald ein Pixelfont da ist | 11 | Behelf |
 | Korruptionsstufe 1 = nur Vignette | + Fluester-Layer (Infrastruktur steht ab Phase 10, zweiter Loop-Platz fehlt) | 5/10 | Feedback unvollstaendig |
+| Riegel = zwei gestapelte Tuer-Kacheln | Fallgitter mit sichtbarer Bewegung | 12 | Pack-Tile, offen = Sprite versteckt |
+| Waechter = SkeletonDemon-Sheet, sonst Skelett-FSM | zweiter Angriffs-State (`Special1/2.png` liegen bereit) | 12 | Verhalten unvollstaendig |

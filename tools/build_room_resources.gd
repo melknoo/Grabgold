@@ -43,12 +43,51 @@ const DOOR_CELL := Vector2i(24, 12)
 const CORRIDOR := Rect2i(25, 11, 9, 2)
 const GOAL := Rect2i(34, 9, 5, 6)
 
-## --- Raeume 02 (B) und 03 (C), Phase 8 ----------------------------------------------------
-## 20x12 = 320x192 px = ein Viewport (auf ganze Tiles gerundet). Bewusst SCHLICHTE Kammern mit
-## umlaufender Wand: sie sind Testgeruest fuer den Raumwechsel, nicht Content (User-Entscheidung).
-## Kein neuer Tuning-Wert, der abgenommen werden muesste.
+## --- Raum 02 (B) — Kampfkammer, Phase 12 ---------------------------------------------------
+## 20x12 = 320x192 px = EIN Viewport (auf ganze Tiles gerundet). Bis Phase 11 eine leere Kammer
+## (Testgeruest fuer den Raumwechsel), seit Phase 12 die Kampfkammer der Kette.
+##
+## Die Groesse bleibt bewusst bei einem Bildschirm: in einem Raum, der scrollt, stuende ein
+## Gegner beim Zuschlagen ausserhalb des Bildes. Prioritaet des Projekts ist Kampfgefuehl, und
+## das faengt bei "man sieht alle drei" an.
+##
+## Vier SAEULEN (2x2) statt einer leeren Flaeche. Sie sind klein und konvex — die Skelette haben
+## kein Pathfinding (`move_dir` zielt direkt auf den Spieler), aber `move_and_slide` laesst sie
+## an einer konvexen Ecke entlangrutschen und wieder herumkommen. Eine konkave Nische waere eine
+## Falle fuer die KI; die gibt es hier darum nicht.
 const SMALL_ROOM := Vector2i(20, 12)
 const SMALL_CHAMBER := Rect2i(1, 1, 18, 10)
+const B_PILLARS: Array[Rect2i] = [
+	Rect2i(4, 3, 2, 2), Rect2i(4, 7, 2, 2), Rect2i(12, 3, 2, 2), Rect2i(12, 7, 2, 2),
+]
+## Der Riegel-Gang: zwei volle Spalten bis auf die Zeilen 5 und 6. Das ist die einzige Oeffnung
+## nach C; darin stehen die beiden Riegel-Kacheln, dahinter der Ausgang.
+##
+## ZWEI Tiles hoch, nicht eine — aus demselben Grund wie der Korridor in Raum 01: die
+## Kollisionsbox des Spielers sitzt 4 px UNTER seinem Ursprung (Fuesse, `player.tscn`). In einer
+## ein Tile hohen Oeffnung bleibt ihm damit ein 8 px schmales Fenster gueltiger Positionen, und
+## wer auf der Mittellinie der Kachel steht, streift schon die Wand darunter. Eine Tuer, durch
+## die man zielen muss, ist keine Tuer.
+##
+## Der Spawn `from_c` (264,88) liegt WESTLICH davon, also im Raum und nicht in der Tasche:
+## wer aus C zurueckkommt, steht nicht hinter dem eigenen Riegel.
+const B_GATE_WALL: Array[Rect2i] = [
+	Rect2i(17, 1, 1, 4), Rect2i(17, 7, 1, 4), Rect2i(18, 1, 1, 4), Rect2i(18, 7, 1, 4),
+]
+
+## --- Raum 03 (C) — Gruftkammer, Phase 12 ---------------------------------------------------
+## 24x16 = 384x256 px. Kein Kampfraum, sondern der Ort zum Durchatmen: Vorraum, ein 2 Tiles
+## hoher Korridor (dieselbe Engstelle wie in Raum 01 — die Linie, auf der der Phase-Dash zaehlt)
+## und dahinter die Halle mit Waechter und Speicherpunkt.
+##
+## Die Reihenfolge ist die Aussage des Raums: der Speicherpunkt liegt HINTER dem Waechter.
+## Wer sichern will, muss an ihm vorbei — mit dem Reif, mit dem Dash oder mit der Figur, die
+## sich das leisten kann.
+const CRYPT_ROOM := Vector2i(24, 16)
+const CRYPT_ANTE := Rect2i(1, 4, 5, 8)      # Vorraum mit dem Eingang aus B
+const CRYPT_CORRIDOR := Rect2i(6, 7, 6, 2)  # 2 Tiles hoch
+const CRYPT_HALL := Rect2i(12, 2, 10, 12)   # Halle mit Waechter, Speicherpunkt und Nische
+const C_PILLARS: Array[Rect2i] = [Rect2i(14, 4, 2, 2), Rect2i(14, 10, 2, 2)]
 
 ## Alle Raeume, die das Tool baut. Ein neuer Raum = ein Eintrag hier.
 ##  * `name`     Wurzel-Node der generierten Szene
@@ -56,6 +95,10 @@ const SMALL_CHAMBER := Rect2i(1, 1, 18, 10)
 ##  * `size`     Raummass in Tiles; MUSS mit `size_tiles` im Raum-Skript uebereinstimmen
 ##  * `walkable` begehbare Rechtecke; alles uebrige wird Wand
 ##  * `cells`    einzelne begehbare Zellen (Raum 01: das Tuerfeld)
+##  * `blocks`   Wandinseln INNERHALB der begehbaren Flaeche (Saeulen, Trennwaende). Phase 12:
+##               ohne sie waere jeder Raum ein leeres Rechteck, und "Raum-Inhalt" hiesse nur
+##               "mehr Gegner". Sie werden NACH `walkable`/`cells` abgezogen — was hier steht,
+##               gewinnt.
 const ROOMS: Array[Dictionary] = [
 	{
 		"name": "Room01Tiles",
@@ -63,6 +106,7 @@ const ROOMS: Array[Dictionary] = [
 		"size": ROOM,
 		"walkable": [CHAMBER, CORRIDOR, GOAL],
 		"cells": [DOOR_CELL],
+		"blocks": [],
 	},
 	{
 		"name": "Room02Tiles",
@@ -70,13 +114,15 @@ const ROOMS: Array[Dictionary] = [
 		"size": SMALL_ROOM,
 		"walkable": [SMALL_CHAMBER],
 		"cells": [],
+		"blocks": B_PILLARS + B_GATE_WALL,
 	},
 	{
 		"name": "Room03Tiles",
 		"path": "res://scenes/rooms/room_03_tiles.tscn",
-		"size": SMALL_ROOM,
-		"walkable": [SMALL_CHAMBER],
+		"size": CRYPT_ROOM,
+		"walkable": [CRYPT_ANTE, CRYPT_CORRIDOR, CRYPT_HALL],
 		"cells": [],
+		"blocks": C_PILLARS,
 	},
 ]
 
@@ -186,6 +232,10 @@ func _build_tiles_scene(tile_set: TileSet, room: Dictionary) -> void:
 
 
 ## Alle begehbaren Zellen eines Raums als Set (Dictionary -> true).
+##
+## Reihenfolge ist Absicht: erst die Flaechen, dann die Einzelzellen, ZULETZT die Wandinseln.
+## `blocks` gewinnt damit immer — eine Saeule mitten in einer begehbaren Flaeche muss man nicht
+## als vier Rechtecke um sie herum formulieren.
 func _walkable_cells(room: Dictionary) -> Dictionary:
 	var cells: Dictionary = {}
 	for rect: Rect2i in room["walkable"]:
@@ -194,6 +244,10 @@ func _walkable_cells(room: Dictionary) -> Dictionary:
 				cells[rect.position + Vector2i(x, y)] = true
 	for cell: Vector2i in room["cells"]:
 		cells[cell] = true
+	for rect: Rect2i in room.get("blocks", [] as Array[Rect2i]):
+		for y in rect.size.y:
+			for x in rect.size.x:
+				cells.erase(rect.position + Vector2i(x, y))
 	return cells
 
 
@@ -201,7 +255,8 @@ func _walkable_cells(room: Dictionary) -> Dictionary:
 ## ohne die Szene zu oeffnen.
 func _print_map(walkable: Dictionary, size: Vector2i, room: Dictionary) -> void:
 	var single: Array = room["cells"]
-	print("Layout ('#' Wand, '.' Boden, 'D' Einzelzelle):")
+	var blocks: Array = room.get("blocks", [])
+	print("Layout ('#' Wand, '.' Boden, 'D' Einzelzelle, 'o' Wandinsel):")
 	for y in size.y:
 		var line := ""
 		for x in size.x:
@@ -210,6 +265,17 @@ func _print_map(walkable: Dictionary, size: Vector2i, room: Dictionary) -> void:
 				line += "D"
 			elif walkable.has(cell):
 				line += "."
+			elif _in_any(cell, blocks):
+				line += "o"
 			else:
 				line += "#"
 		print("  " + line)
+
+
+## Liegt die Zelle in einem der Rechtecke? Nur fuer die ASCII-Ausgabe — die Kachelbelegung
+## selbst kennt nur "begehbar oder nicht".
+func _in_any(cell: Vector2i, rects: Array) -> bool:
+	for rect: Rect2i in rects:
+		if rect.has_point(cell):
+			return true
+	return false

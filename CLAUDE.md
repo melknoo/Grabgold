@@ -139,6 +139,7 @@ resources/          tuning_stats.gd + figure_profile.gd + room_registry.gd + sav
 components/         hitbox, hurtbox, state_machine/  (wiederverwendbar)
 actors/player/      player.tscn/.gd + party_manager.gd + reif.gd + states/{idle,move,attack,hurt,dash}.gd
 actors/enemy/       enemy.tscn/.gd + states/{idle,approach,telegraph,attack,retreat,hurt}.gd
+                    waechter.tscn (geerbt von skeleton.tscn, Phase 12)
 actors/props/       door.tscn/.gd + pressure_plate.tscn/.gd (Raum-Interaktion, Phase 6)
                     room_exit.tscn/.gd (Raum-Tuer, Phase 8)
                     save_point.tscn/.gd (Speicherpunkt, Phase 9)
@@ -153,6 +154,7 @@ ui/transition_fade/ Blende des Raumwechsels (Phase 8, vom RoomManager instanzier
 scenes/             boot.tscn (HUELLE, run/main_scene ab Phase 11)
                     main.tscn (persistente Weltszene, `class_name World`) + rooms/
 scenes/rooms/       room.gd (Basis) + spawn_point.gd + room_0{1,2,3}.tscn
+                    + room_0{1,2,3}.gd (Raum-Verdrahtung; 02/03 seit Phase 12)
                     + room_0{1,2,3}_tiles.tscn (generiert)
 tools/              Godot-Tool-Skripte, die Resources/Settings generieren (nie von Hand editieren)
 tests/              headless Verifikations-Szenen (*_sim.tscn/.gd)
@@ -223,6 +225,16 @@ Zeitdehnung/Hitstop **niemals** über `Engine.time_scale` (träfe UI + Partikel)
 - **Gegner** (`actors/enemy/skeleton.*`): FSM idle→approach→telegraph→attack→retreat (+hurt/dead),
   **kein Pathfinding** (Bewegung direkt Richtung/weg vom Player). Telegraph = Rot-Blink + gehaltene
   Attack-Pose (Lesbarkeit). Nutzt `Hitbox`/`Hurtbox` (enemy_hitbox 64 → player_hurtbox 8).
+- **Kein Pathfinding heißt: Hindernisse müssen konvex sein.** `move_and_slide` lässt einen Gegner
+  an einer Säulenecke entlangrutschen und wieder herumkommen; eine konkave Nische wäre eine Falle.
+  Gilt für jedes künftige Raum-Layout (Phase 12).
+- **Eine neue Gegnerart ist keine neue Klasse** (Phase 12): `actors/enemy/waechter.tscn` erbt von
+  `skeleton.tscn` und tauscht nur `SpriteFrames` (SkeletonDemon) und `TuningStats`
+  (`enemy_waechter.tres`). **Einfärben per `modulate` funktioniert nicht** — `states/telegraph.gd`
+  und `states/hurt.gd` setzen `sprite.modulate` bei jedem Blinken auf Weiß zurück; nur der
+  Alpha-Kanal überlebt (den bespielt die Hurtbox).
+- **`knockback_taken_scale` gilt seit Phase 12 auch für Gegner** (`Skeleton._on_hurt`). Default
+  1.0 = unverändert; der Wächter steht mit 0.35 fester und lässt sich nicht in die Ecke prügeln.
 
 ## Figuren-Ensemble (Phase 4)
 
@@ -257,6 +269,15 @@ Profil-`.tres` schreiben, in `PartyManager.figures` eintragen — **kein Code**.
   Die Layouts stehen als Rechteck-Konstanten in der Tabelle `ROOMS` im Tool und werden beim Lauf
   als ASCII-Karte ausgegeben — wer einen Raum ändern oder anlegen will, tut es dort. Die Tile-Auswahl ist **empirisch**
   belegt (voll deckend + selbst-nahtlos kachelbar), nicht nach Augenmaß gegriffen.
+  Felder je Raum: `walkable` (begehbare Rechtecke), `cells` (Einzelzellen) und seit Phase 12
+  **`blocks`** (Wandinseln *innerhalb* der Fläche — Säulen, Trennwände). `blocks` wird zuletzt
+  abgezogen und gewinnt darum immer.
+- `$GODOT --headless --path . --script res://tools/build_enemy_resources.gd` baut die
+  `SpriteFrames` **aller** Gegner (`skeleton_frames.tres`, `skeleton_demon_frames.tres`) aus dem
+  Pack. Ein neuer Gegner ist ein Eintrag in der Tabelle `ENEMIES` plus ein `TuningStats`-`.tres`
+  — **kein Code** (dieselbe Regel wie `FigureProfile` für die Figuren). Konvention wie überall:
+  Spalte = Richtung, Zeile = Frame; `dead` ist **richtungslos** (`states/dead.gd` spielt `dead`,
+  nicht `dead_<facing>`).
 - `$GODOT --headless --path . --script res://tools/add_input_actions.gd` legt fehlende
   Input-Actions per ProjectSettings-API an (idempotent).
 - `$GODOT --headless --path . --script res://tools/build_audio_resources.gd` baut
@@ -546,6 +567,33 @@ Vierter Besitzer neben RoomManager (Raum), SaveManager (Fortschritt) und AudioMa
 - Die Regler zeigen **Prozentzahlen, keinen Balken**: der Standardfont ist nicht monospaced.
   Siehe `docs/assets-todo.md`.
 
+## Raum-Inhalt (Phase 12)
+
+Bis Phase 11 war **A** der einzige Raum mit einer Aufgabe; **B** und **C** waren leere Rechtecke
+(Testgerüst für den Raumwechsel). Seit Phase 12 hat jeder Raum ein Verb:
+
+- **A** (40×24) = Gewicht und Zeit (Platte/Tür, Phase 6). **Unverändert** — die Puzzle-Zahl
+  (304 px gegen `open_frames`) hängt an Geometrie und Positionen.
+- **B** (`Room02`, 20×12) = **Kampfkammer**: vier Säulen, drei Skelette, ein **Riegel** vor dem
+  Ausgang nach C. Bleibt **ein Bildschirm** — in einem scrollenden Raum stünde ein zuschlagender
+  Gegner außerhalb des Bildes.
+- **C** (`Room03`, 24×16) = **Gruftkammer**: Vorraum, 2-Tile-Korridor, Halle mit **Wächter** und
+  dem Speicherpunkt **hinter** ihm.
+
+- **Der Riegel ist eine `Door`** ohne Zähler (`open_permanently(announce)`), verdrahtet im
+  Raum-Skript wie Platte→Tür in `room_01.gd`. `Room02` öffnet **alle** `Door`-Kinder, weil die
+  Öffnung zwei Kacheln hoch ist.
+- **Durchgänge sind zwei Tiles hoch.** Die Kollisionsbox des Spielers sitzt **4 px unter** seinem
+  Ursprung (Füße, `player.tscn`); eine ein Tile hohe Öffnung lässt ihm ein 8 px schmales Fenster,
+  und auf der Mittellinie der Kachel streift er schon die Wand darunter. Gilt für jeden neuen
+  Durchgang.
+- **Der geräumte Raum steht im Spielstand, die Gegner nicht.** Die drei Skelette in B haben
+  **keine** `persist_id` (normale Gegner respawnen, Regel aus Phase 8); der Riegel merkt sich den
+  Raum als Welt-Flag `gate:room_02` (`Room02.CLEARED_FLAG`). Sonst wäre die Rückkehr aus C ein
+  zweiter Pflichtkampf am selben Riegel.
+- **Der Wächter** trägt `persist_id = skeleton_c` und bleibt tot (Phase 9). Genau da liegt der
+  Unterschied: ein Kampf, den der Raum *stellt*, gegen einen Gegner, den man einmal wegräumt.
+
 ## Tests
 
 - `$GODOT --headless --path . res://tests/phase4_sim.tscn` — Figurenwechsel (27 Checks).
@@ -565,8 +613,13 @@ Vierter Besitzer neben RoomManager (Raum), SaveManager (Fortschritt) und AudioMa
   zum Mix, Datei, kaputte Datei), Hauptmenue ohne Welt, neues Spiel in einem gewaehlten Slot,
   Laden, Loeschen mit Bestaetigung, Optionen aus beiden Aufrufern, Pause (Raum steht wirklich),
   wann die Pause **nicht** aufgeht, der dritte Game-Over-Eintrag, Menue-Klaenge (146 Checks).
+- `$GODOT --headless --path . res://tests/phase12_sim.tscn` — Raum-Inhalt: Geometrie von B und C
+  (gegen die generierte `Walls`-Ebene, nicht gegen die Tabelle im Tool), Aufstellung, Riegel
+  (solide, oeffnet erst beim dritten Toten, bleibt offen, steht im Spielstand, man laeuft zu Fuss
+  hindurch), Waechter (Sheet, Stats, Knockback-Faktor), und dass nichts in einer Wand steht
+  (71 Checks).
 
-Alle acht müssen „ALLES GRUEN" melden (**634 Checks**).
+Alle neun müssen „ALLES GRUEN" melden (**705 Checks**).
 
 **`phase11_sim` haengt `boot.tscn` unter sich**, nicht `main.tscn` wie die sechs Suiten davor —
 genau darum geht es in der Phase. Es setzt zusaetzlich `Settings.path` auf eine eigene `.cfg`

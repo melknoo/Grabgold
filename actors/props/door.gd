@@ -25,9 +25,14 @@ const CLOSE_PITCH := 0.8
 
 var _open: bool = false
 var _frames_left: int = 0
+var _held: bool = false
 
 func is_open() -> bool:
 	return _open
+
+## Steht die Tuer dauerhaft offen (Riegel, Phase 12)? Dann laeuft kein Zaehler mehr.
+func is_held() -> bool:
+	return _held
 
 func frames_left() -> int:
 	return _frames_left
@@ -47,8 +52,29 @@ func open_for(frames: int) -> void:
 	AudioManager.play(&"door_move")
 	door_opened.emit()
 
+## Oeffnet die Tuer und LAESST SIE OFFEN (Riegel, Phase 12). Kein Zaehler, kein Schliessen.
+##
+## Warum dieselbe Klasse und kein zweiter Prop: eine Tuer ist ein solider Koerper auf
+## `environment`, der auf ein Ereignis hin aus dem Weg geht — ob das Ereignis ein Gewicht
+## (Raum 01) oder der letzte gefallene Gegner (Raum 02) ist, aendert daran nichts. Der
+## Unterschied ist genau eine Zeile: der Zaehler laeuft nicht.
+##
+## `announce = false` fuer den Aufbau eines bereits geraeumten Raums: der Riegel steht dann von
+## Anfang an offen, und ein Tuerklang beim Betreten waere eine Meldung ueber nichts.
+func open_permanently(announce: bool = true) -> void:
+	_held = true
+	if _open:
+		return
+	_open = true
+	_frames_left = 0
+	_shape.set_deferred("disabled", true)
+	_sprite.visible = false
+	if announce:
+		AudioManager.play(&"door_move")
+	door_opened.emit()
+
 func _physics_process(_delta: float) -> void:
-	if not _open:
+	if not _open or _held:
 		return
 	if _frames_left > 0:
 		_frames_left -= 1

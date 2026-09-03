@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
-[ext_resource type="Script" path="res://scenes/rooms/room.gd" id="1_room"]
+[ext_resource type="Script" path="res://scenes/rooms/room_02.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/rooms/room_02_tiles.tscn" id="2_tiles"]
 [ext_resource type="Script" path="res://scenes/rooms/spawn_point.gd" id="3_spawn"]
 [ext_resource type="PackedScene" path="res://actors/props/room_exit.tscn" id="4_exit"]
 [ext_resource type="PackedScene" path="res://actors/enemy/skeleton.tscn" id="5_skeleton"]
+[ext_resource type="PackedScene" path="res://actors/props/door.tscn" id="6_door"]
 
 [node name="Room02" type="Node2D"]
 script = ExtResource("1_room")
@@ -29,10 +30,27 @@ position = Vector2(24, 88)
 target_room = &"room_01"
 target_spawn = &"from_b"
 
+[node name="Riegel" parent="." instance=ExtResource("6_door")]
+position = Vector2(280, 88)
+
+[node name="RiegelUnten" parent="." instance=ExtResource("6_door")]
+position = Vector2(280, 104)
+
 [node name="ExitToC" parent="." instance=ExtResource("4_exit")]
 position = Vector2(296, 88)
 target_room = &"room_03"
 target_spawn = &"start"
 
+[node name="ExitToCUnten" parent="." instance=ExtResource("4_exit")]
+position = Vector2(296, 104)
+target_room = &"room_03"
+target_spawn = &"start"
+
 [node name="Skeleton" parent="." instance=ExtResource("5_skeleton")]
-position = Vector2(168, 88)
+position = Vector2(152, 88)
+
+[node name="SkeletonNord" parent="." instance=ExtResource("5_skeleton")]
+position = Vector2(112, 40)
+
+[node name="SkeletonSued" parent="." instance=ExtResource("5_skeleton")]
+position = Vector2(208, 144)

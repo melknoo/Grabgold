@@ -1,16 +1,16 @@
 [gd_scene load_steps=7 format=3]
 
-[ext_resource type="Script" path="res://scenes/rooms/room.gd" id="1_room"]
+[ext_resource type="Script" path="res://scenes/rooms/room_03.gd" id="1_room"]
 [ext_resource type="PackedScene" path="res://scenes/rooms/room_03_tiles.tscn" id="2_tiles"]
 [ext_resource type="Script" path="res://scenes/rooms/spawn_point.gd" id="3_spawn"]
 [ext_resource type="PackedScene" path="res://actors/props/room_exit.tscn" id="4_exit"]
-[ext_resource type="PackedScene" path="res://actors/enemy/skeleton.tscn" id="5_skeleton"]
+[ext_resource type="PackedScene" path="res://actors/enemy/waechter.tscn" id="5_waechter"]
 [ext_resource type="PackedScene" path="res://actors/props/save_point.tscn" id="6_save"]
 
 [node name="Room03" type="Node2D"]
 script = ExtResource("1_room")
 room_id = &"room_03"
-size_tiles = Vector2i(20, 12)
+size_tiles = Vector2i(24, 16)
 music_id = &"crypt"
 
 [node name="Tiles" parent="." instance=ExtResource("2_tiles")]
@@ -25,15 +25,15 @@ position = Vector2(24, 88)
 target_room = &"room_02"
 target_spawn = &"from_c"
 
-[node name="Skeleton" parent="." instance=ExtResource("5_skeleton")]
-position = Vector2(200, 88)
+[node name="Waechter" parent="." instance=ExtResource("5_waechter")]
+position = Vector2(232, 128)
 persist_id = &"skeleton_c"
 
 [node name="SavePoint" parent="." instance=ExtResource("6_save")]
-position = Vector2(120, 88)
+position = Vector2(328, 128)
 spawn_id = &"save_c"
 
 [node name="SpawnSaveC" type="Marker2D" parent="."]
-position = Vector2(104, 88)
+position = Vector2(312, 128)
 script = ExtResource("3_spawn")
 spawn_id = &"save_c"

@@ -1333,11 +1333,164 @@ freigegeben wird.
 - **Die zwei Engine-Zeilen beim Beenden** (Phase 10) bleiben im normalen Spiellauf stehen,
   jetzt ausgelöst vom Titelstück. Sie sind erklärt und harmlos, aber sie stehen da.
 
+## Phase 12 — Raum-Inhalt: Kampfkammer und Gruftkammer (abgeschlossen, 2026-09-03)
+
+Seit Phase 8 gibt es drei Räume, aber nur einer war einer. **A** trägt das Platte-Tür-Puzzle aus
+Phase 6; **B** und **C** waren leere 20×12-Rechtecke mit je einem Skelett darin, ausdrücklich als
+Testgerüst für den Raumwechsel gebaut und in `tools/build_room_resources.gd` auch so kommentiert
+(„Bewusst SCHLICHTE Kammern […], sie sind Testgerüst für den Raumwechsel, nicht Content").
+Zehn Phasen lang sind Verben dazugekommen — Angriff, Dash, Reif, Figurenwechsel, Gewicht,
+Speichern —, und ab Raum A traf keines davon mehr auf einen Raum, der etwas von ihm wollte.
+Diese Phase gibt B und C einen Grund.
+
+**Was steht**
+
+- **Das Bau-Tool kennt Wandinseln.** `tools/build_room_resources.gd` hat pro Raum ein neues Feld
+  `blocks`: Rechtecke, die **nach** `walkable`/`cells` wieder abgezogen werden. Vorher konnte ein
+  Raum nur ein Rechteck (oder mehrere aneinandergelegte) sein — eine Säule mitten in einer Fläche
+  hätte man als vier Rechtecke um sie herum formulieren müssen. Die ASCII-Karte im Tool-Output
+  zeigt sie als `o`.
+- **Raum B = Kampfkammer** (20×12, unverändert **ein** Bildschirm): vier 2×2-Säulen, **drei**
+  Skelette, und ein **Riegel** vor dem Ausgang nach C. Der Riegel fährt hoch, sobald keiner mehr
+  steht — vorher kommt man nicht weiter. Der Weg zurück nach A bleibt offen.
+- **Raum C = Gruftkammer** (24×16): Vorraum, ein 2 Tiles hoher Korridor, dahinter die Halle mit
+  zwei Säulen, dem **Wächter** und — hinter ihm — dem Speicherpunkt.
+- **Der Wächter** ist keine neue Klasse: `actors/enemy/waechter.tscn` erbt von `skeleton.tscn`
+  und tauscht zwei Dinge, ein `SpriteFrames` (SkeletonDemon aus dem Pack) und ein
+  `TuningStats`-`.tres` (`enemy_waechter.tres`: 9 Health, Schaden 2, langsamer, längerer
+  Telegraph, `knockback_taken_scale = 0.35`). Er trägt die `persist_id` `skeleton_c` aus Phase 9
+  und bleibt damit tot.
+- **`tools/build_enemy_resources.gd`** baut die SpriteFrames **aller** Gegner aus dem Pack.
+  `skeleton_frames.tres` war die letzte Resource im Projekt, die von Hand entstanden war; sie
+  kommt jetzt aus dem Tool und ist dabei **Byte für Byte dieselbe** geblieben (nur die
+  zufälligen Sub-Resource-IDs unterscheiden sich).
+- **`Door.open_permanently()`** — dieselbe Tür wie in Raum 01, nur ohne Zähler.
+- **`Skeleton` liest `knockback_taken_scale`.** Das Feld lag seit Phase 4 in `TuningStats`, aber
+  nur der Player fragte es.
+
+**Entscheidungen**
+
+- *B bleibt ein Bildschirm.* 20×12 = 320×192 px, also genau der Viewport. Ein größerer Raum hätte
+  gescrollt, und beim Scrollen steht ein zuschlagender Gegner außerhalb des Bildes. Die Priorität
+  des Projekts heißt Kampfgefühl, und das fängt bei „man sieht alle drei" an. Gewachsen ist
+  stattdessen **C** (24×16) — der Raum, in dem nicht gekämpft wird.
+- *Der Riegel ist der Grund, warum der Kampf zählt.* Bis hierher konnte man jeden Gegner stehen
+  lassen und weiterlaufen; der Kampf war Dekoration. Genau **eine** Stelle in der Kette macht ihn
+  zur Bedingung. Der Weg **zurück** bleibt offen — eingesperrt wird niemand, Rückzug bleibt ein
+  Zug.
+- *Der Riegel ist eine `Door`, kein neuer Prop.* Eine Tür ist ein solider Körper auf
+  `environment`, der auf ein Ereignis hin aus dem Weg geht. Ob das Ereignis ein Gewicht (Raum 01)
+  oder der letzte gefallene Gegner ist, ändert daran nichts. Der Unterschied ist eine Zeile: der
+  Zähler läuft nicht.
+- *Die Öffnung ist zwei Tiles hoch — und das ist kein Detail.* Die Kollisionsbox des Spielers
+  sitzt 4 px **unter** seinem Ursprung (Füße). In einer ein Tile hohen Öffnung bleibt ihm damit
+  ein 8 px schmales Fenster gültiger Positionen, und wer auf der Mittellinie der Kachel steht,
+  streift schon die Wand darunter. Eine Tür, durch die man zielen muss, ist keine Tür. Zwei
+  Kacheln Öffnung heißen zwei `Door`-Nodes, und der Raum öffnet einfach **alle** seine Türen —
+  kein Sonderfall im Code, eine Schleife.
+- *Der geräumte Raum steht im Spielstand, die Gegner nicht.* Die drei Skelette bekommen bewusst
+  **keine** `persist_id`: normale Gegner respawnen, das ist die Regel seit Phase 8. Der Riegel
+  dagegen merkt sich den geräumten Raum als Welt-Flag `gate:room_02` (Phase-9-Mechanik, keine
+  neue Infrastruktur). Sonst wäre die Rückkehr aus C ein zweiter Pflichtkampf am selben Riegel —
+  eine Strafe fürs Zurückgehen.
+- *Der Speicherpunkt liegt hinter dem Wächter.* Das ist die ganze Aussage von Raum C: sichern
+  kostet einmal etwas. Vorher stand er frei in der Kammer herum.
+- *Eine neue Gegnerart ist ein Tool-Eintrag plus ein `.tres`.* Dieselbe Regel, die seit Phase 4
+  für Figuren gilt (`FigureProfile`). Darum die geerbte Szene und das Tabellen-Tool statt einer
+  zweiten Handarbeit an einer `.tres`.
+- *Der Wächter ist nicht eingefärbt, sondern hat ein eigenes Sheet.* Der naheliegende Weg wäre
+  ein `modulate` auf dem Sprite gewesen — er hält keinen Angriff durch: `states/telegraph.gd` und
+  `states/hurt.gd` setzen `sprite.modulate` bei jedem Blinken auf Weiß zurück. Nur der Alpha-Kanal
+  überlebt (den bespielt die Hurtbox), die Farbe nicht.
+- *`knockback_taken_scale` gilt jetzt auch für Gegner.* Ohne das wäre der Wächter nur „ein
+  Skelett mit mehr Health"; mit ihm ist er einer, den man nicht einfach in die Ecke prügelt. Der
+  Default 1.0 lässt jeden bisherigen Gegner unverändert — die Zeile ist additiv, kein
+  Feel-Eingriff in Bestehendes.
+- *Säulen sind klein und konvex.* Die Skelette haben kein Pathfinding (`move_dir` zielt direkt
+  auf den Spieler); `move_and_slide` lässt sie an einer konvexen Ecke entlangrutschen und wieder
+  herumkommen. Eine konkave Nische wäre eine Falle für die KI — die gibt es darum nicht.
+- *Raum A wurde nicht angefasst.* Die Puzzle-Zahl aus Phase 6 (Platte→Tür = 304 px gegen
+  `open_frames`, Zwerg- und Kurier-Reichweite) hängt an Positionen und Geometrie; sie steht auch
+  hier unverändert.
+
+**Beim Bau aufgelaufen (und behoben)**
+
+- *Die erste Fassung des Riegel-Gangs war ein Tile hoch* — und der Test kam nicht hindurch: der
+  Spieler blieb auch bei offenem Riegel hängen, `test_move` meldete auf der Mittellinie der
+  Kachel eine Kollision. Ursache war nicht der Riegel, sondern der 4-px-Versatz der
+  Kollisionsbox (siehe oben). Dass Raum 01 mit seiner ein Tile hohen Türöffnung trotzdem
+  funktioniert, liegt daran, dass der Korridor dahinter zwei Tiles hoch ist und ein Mensch
+  automatisch nach oben ausweicht — headless tut das niemand. Die Öffnung ist jetzt zwei Tiles
+  hoch, und der Test läuft die Strecke **zu Fuß** ab, statt sie nur zu behaupten.
+- *`skeleton_frames.tres` neu zu bauen war der Lackmustest für das Tool.* Der Vergleich
+  vorher/nachher (Sub-Resource-IDs normalisiert) ist leer — das Tool reproduziert die Handarbeit
+  exakt, also ist auch das zweite Sheet nach denselben Regeln gebaut.
+
+**Verifikation (headless, `tests/phase12_sim.*`, 71/71 grün)**
+
+- **Geometrie:** B misst 20×12 (= 320×192 px, ein Bildschirm), C misst 24×16 (384×256); die
+  Kamera-Limits folgen beiden. Gefragt wird die **generierte `Walls`-Ebene**, nicht die
+  Rechteck-Tabelle im Tool: Säulen stehen, die Mitte ist frei, der Riegel-Gang ist zugemauert
+  und **genau zwei Zeilen** sind offen; Cs Korridor ist zwei Tiles hoch und darüber wie darunter
+  Wand.
+- **Aufstellung in B:** drei Gegner, alle drei leben, **keiner** ist persistent; der Riegel ist
+  zwei Kacheln hoch, steht, ist **wirklich solide** (`test_move` vom Spawn `from_c` nach Osten),
+  der Ausgang liegt dahinter, der Weg zurück nach A ist frei.
+- **Der Riegel:** nach dem ersten und zweiten Toten bleibt er zu, nach dem dritten öffnet er —
+  **beide** Kacheln —, bleibt offen (kein Zähler, auch 90 Frames später), setzt das Welt-Flag,
+  und der Spieler **läuft** anschließend zu Fuß hinaus und steht in C (26 Frames).
+- **Der Wächter:** eigene Stats (9 Health, Schaden 2, längerer Telegraph), eigenes Sheet aus dem
+  Pack-Ordner `SkeletonDemon`, **dieselben 13 Animationen** wie das Skelett (inklusive des
+  richtungslosen `dead`, an dem `states/dead.gd` hängt), `persist_id` gesetzt; er steht hinter
+  dem Korridor und **vor** dem Speicherpunkt, der Spawn `save_c` liegt beim Punkt. 200 px/s
+  Knockback werden bei ihm zu 70.
+- **Rückkehr nach B:** der Riegel steht schon **beim Betreten** offen (nicht erst nach einem
+  Frame), der Raum gilt weiter als geräumt, die drei Skelette sind zurück, und der Spawn `from_c`
+  liegt im Raum und nicht in der Tasche hinter dem Riegel.
+- **Spielstand:** Slot schreiben → „Neu beginnen" räumt das Flag ab und der Riegel ist wieder zu
+  → Laden bringt Raum, Flag und offenen Riegel zurück.
+- **Nichts steht in einer Wand:** für A, B und C wird **jedes** Kind des Raums (Spawn-Punkte,
+  Türen, Gegner, Platte, Speicherpunkt) gegen die Wand-Ebene geprüft. Das ist der Fehler, der
+  beim Verschieben von Layouts als erstes passiert und headless sonst nie auffällt.
+- **Regression:** phase4 (27), phase5 (57), phase6 (28), phase7 (37), phase8 (84), phase9 (135),
+  phase10 (120), phase11 (146) alle weiterhin „ALLES GRUEN" — zusammen mit phase12 (71)
+  **705 Checks**, 0 Fehler. `phase9_sim` musste zwei Stellen nachziehen: der Gegner in C heißt
+  jetzt `Waechter`, und der Spawn `save_c` liegt an einer anderen Stelle des größeren Raums.
+- **Fensterlauf** fehlerfrei (12 s, kein stderr).
+
+**Was vorher offen war und jetzt zu ist**
+
+- „Raum-Inhalt statt Testgerüst (B und C sind bewusst Gerüst, kein Content)" (Phase 10/11) — B
+  und C sind Räume mit einer Aufgabe.
+- „Ein Flag-System für Bosse/Quest-Kills kommt mit dem Speichern" (Phase 8) — steht seit Phase 9
+  und wird hier zum ersten Mal für etwas anderes als einen Kill benutzt.
+
+**Offen / bekannte Punkte**
+
+- **Der Mix ist weiterhin nicht abgenommen** (Phase 10/11). Neu dazu: der Riegel benutzt den
+  Behelfs-Türklang aus Phase 10, jetzt an einer Stelle, an der er **doppelt** ausgelöst wird
+  (zwei Kacheln) und nur durch die Dedup-Regel des AudioManagers einfach klingt.
+- **Kein Kampfstück in B.** `music_id` steht pro Raum bereit und `17 - Fight.ogg` liegt im Pack,
+  aber ein Wechsel „Kampf läuft / Kampf vorbei" bräuchte einen Aggro-Zustand über alle Gegner
+  eines Raums. Den gibt es nicht — und der Riegel wäre jetzt der natürliche Aufhänger dafür.
+- **Der Riegel hat kein eigenes Sprite** — er zeigt dieselbe Tür-Kachel wie Raum 01. Ein
+  Fallgitter, das sichtbar herunter- und hochfährt, wäre die richtige Lesbarkeit; im Pack liegt
+  dafür nichts Geprüftes.
+- **Drei Skelette sind eine Zahl ohne Abnahme.** Ob der Kampf in B mit Kurier und Zwerg fair,
+  zäh oder trivial ist, entscheidet das Spielen. Die Stellschrauben sind die Positionen im
+  `.tscn` und `enemy_skeleton.tres` — kein Code.
+- **Der Wächter kämpft wie ein Skelett**, nur zäher: dieselbe FSM, dieselbe Reichweite, kein
+  eigener Angriff. Ein zweiter Angriffs-State (Ausfallschritt, Flächenschlag) wäre der nächste
+  Schritt, wenn C mehr sein soll als eine Hürde.
+- **Kein Y-Sort, weiterhin.** Die Säulen sind flache 16×16-Blöcke ohne Oberkante wie die Wände;
+  es gibt nichts zu sortieren. Sobald eine Säule höher wird als ein Tile, ändert sich das.
+- **Kein Grund, nach C zu gehen, außer dem Speicherpunkt.** Die Kette endet dort. Was in einer
+  Gruft am Ende steht — Schatz, Aufstieg, Boss —, ist eine Content-Entscheidung, keine
+  technische.
+
 ## Nächste Phase
-- **Phase 12** — noch nicht festgelegt. Von den drei Kandidaten aus Phase 10 ist einer erledigt
-  (Hauptmenü mit Slot-Auswahl **und** Optionen). Offen bleiben:
-  **Raum-Inhalt statt Testgerüst** (B und C sind bewusst Gerüst, kein Content) und die
-  **Feel-Abnahme des Mixes**, die keine eigene Phase sein muss, aber vor jedem weiteren
-  Ton-Ausbau stattfinden sollte — die Regler dafür stehen seit dieser Phase.
-  Neu dazu: ein **projektweites `Theme` mit Pixelfont**, weil das Spiel jetzt mit einem
-  Textbildschirm anfängt. Erst nach Go des Users.
+- **Phase 13** — noch nicht festgelegt. Offen sind weiterhin die **Feel-Abnahme des Mixes**
+  (Regler seit Phase 11 da, 19 Klang-Zuordnungen weiter ungehört) und das **projektweite `Theme`
+  mit Pixelfont** (das Spiel fängt mit einem Textbildschirm an). Neu dazu aus dieser Phase:
+  **Kampfmusik am Riegel** (der Aufhänger dafür steht jetzt) und ein **zweiter Angriffs-State
+  für den Wächter**. Erst nach Go des Users.

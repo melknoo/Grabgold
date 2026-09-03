@@ -105,8 +105,13 @@ func get_health() -> int:
 
 func _on_hurt(damage: int, knockback: Vector2) -> void:
 	_health = maxi(0, _health - damage)
-	velocity = knockback
+	# `knockback_taken_scale` lag bis Phase 11 brach: nur der Player las ihn (der Zwerg steht mit
+	# 0.0 wie ein Fels). Fuer den Waechter in Raum C ist genau das die Achse, die ihn von einem
+	# Skelett mit mehr Health unterscheidet — er weicht nicht zurueck, also darf man ihn nicht
+	# einfach in die Ecke pruegeln. Der Default 1.0 laesst jeden bisherigen Gegner unveraendert.
+	var taken: Vector2 = knockback * stats.knockback_taken_scale
+	velocity = taken
 	if _health == 0:
 		state_machine.transition_to(&"dead")
 	else:
-		state_machine.transition_to(&"hurt", {"knockback": knockback})
+		state_machine.transition_to(&"hurt", {"knockback": taken})

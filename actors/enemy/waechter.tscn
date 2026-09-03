@@ -1,0 +1,15 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://actors/enemy/skeleton.tscn" id="1_base"]
+[ext_resource type="Resource" path="res://resources/enemy_waechter.tres" id="2_stats"]
+[ext_resource type="SpriteFrames" path="res://resources/skeleton_demon_frames.tres" id="3_frames"]
+
+[node name="Waechter" instance=ExtResource("1_base")]
+stats = ExtResource("2_stats")
+aggro_range = 95.0
+attack_range = 22.0
+telegraph_frames = 45
+retreat_frames = 40
+
+[node name="AnimatedSprite2D" parent="." index="0"]
+sprite_frames = ExtResource("3_frames")
